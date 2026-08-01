@@ -270,8 +270,9 @@
         <!-- Mobile scrim -->
         <div id="sidebarScrim" class="hidden fixed inset-0 z-30 bg-black/60 md:hidden"></div>
 
-        <!-- Nav rail — sticky bottom trên mobile (đồng bộ settings.html), cột trái trên desktop -->
-        <nav class="fixed sm:static bottom-0 left-0 z-50 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0"
+        <!-- Bottom / side nav (ẩn khi đang trong chat trên mobile) -->
+        <nav id="bottomNav"
+             class="fixed sm:static bottom-0 left-0 z-50 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0"
              style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
             <div class="contents sm:flex sm:flex-col sm:items-center sm:w-full">
                 <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
@@ -313,9 +314,9 @@
             </a>
         </nav>
 
-        <!-- Chat list (mobile: full-width overlay; desktop: cột 380px) -->
+        <!-- Chat list -->
         <div id="sidebarWrap"
-             class="fixed md:static inset-x-0 top-0 bottom-[60px] md:bottom-0 md:inset-y-0 left-0 z-40 flex h-auto md:h-full w-full md:w-[380px] md:max-w-none transition-transform duration-200 translate-x-0"
+             class="fixed md:static inset-x-0 top-0 bottom-[60px] md:inset-y-0 md:bottom-0 left-0 z-40 flex h-auto md:h-full w-full md:w-[380px] transition-transform duration-200 translate-x-0"
              style="background-color: var(--canvas);">
             <div class="flex min-w-0 flex-1 flex-col h-full"
                  style="border-right: 1px solid var(--hairline); background-color: var(--surface);">
@@ -359,8 +360,8 @@
             </div>
         </div>
 
-        <!-- Main panel — luôn có trên mobile để mở chat khi chọn -->
-        <div id="mainPanel" class="flex min-w-0 flex-1 flex-col relative h-full" style="background-color: var(--canvas);">
+        <!-- Main panel (hiện trên mobile khi mở chat) -->
+        <div id="mainPanel" class="flex min-w-0 flex-1 flex-col relative h-full min-h-0" style="background-color: var(--canvas);">
 
             <!-- Empty state -->
             <div id="emptyState" class="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
@@ -381,15 +382,15 @@
             </div>
 
             <!-- Active chat -->
-            <div id="activeChat" class="hidden flex-1 flex-col min-w-0">
-                <!-- Header -->
-                <header class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
-                        style="border-bottom: 1px solid var(--hairline);">
+            <div id="activeChat" class="hidden flex-1 flex-col min-w-0 min-h-0 h-full">
+                <!-- Header sticky khi scroll tin nhắn -->
+                <header class="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-3 sm:px-6 shrink-0"
+                        style="border-bottom: 1px solid var(--hairline); background-color: var(--canvas);">
                     <div class="flex min-w-0 items-center gap-3">
-                        <button type="button" id="openSidebarBtn" aria-label="Open conversations"
+                        <button type="button" id="openSidebarBtn" aria-label="Back to conversations"
                                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-elevated md:hidden"
                                 style="color: var(--muted);">
-                            <i data-lucide="menu" class="w-[19px] h-[19px]"></i>
+                            <i data-lucide="arrow-left" class="w-[19px] h-[19px]"></i>
                         </button>
                         <div id="chatHeaderAvatar" class="relative shrink-0"></div>
                         <div class="min-w-0">
