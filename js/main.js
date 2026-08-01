@@ -803,17 +803,28 @@
         renderChatList();
     });
 
+    function isMobileView() {
+        return window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+    }
+
     function openSidebar() {
+        if (!sidebarWrap) return;
         sidebarWrap.classList.remove("-translate-x-full");
-        sidebarScrim.classList.remove("hidden");
+        if (sidebarScrim) sidebarScrim.classList.add("hidden");
     }
     function closeSidebar() {
-        sidebarWrap.classList.add("-translate-x-full");
-        sidebarScrim.classList.add("hidden");
+        // Chỉ ẩn list trên mobile khi vào chat; desktop luôn hiện list
+        if (!sidebarWrap) return;
+        if (isMobileView()) {
+            sidebarWrap.classList.add("-translate-x-full");
+        } else {
+            sidebarWrap.classList.remove("-translate-x-full");
+        }
+        if (sidebarScrim) sidebarScrim.classList.add("hidden");
     }
-    openSidebarBtn.addEventListener("click", openSidebar);
-    closeSidebarBtn.addEventListener("click", closeSidebar);
-    sidebarScrim.addEventListener("click", closeSidebar);
+    if (openSidebarBtn) openSidebarBtn.addEventListener("click", openSidebar);
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener("click", closeSidebar);
+    if (sidebarScrim) sidebarScrim.addEventListener("click", closeSidebar);
 
     function selectChat(chatId) {
         state.activeChatId = chatId;
@@ -1597,63 +1608,7 @@
         }
     }
 
-    /* ============ UPLOAD ẢNH → bucket chat-images (public) ============ */
-    async function uploadChatImage(file) {
-        if (!window.supabaseClient) {
-            console.error("[ZChat] upload: supabaseClient missing");
-            return null;
-        }
-        if (!file || !file.type.startsWith("image/")) return null;
-
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Ảnh quá lớn (tối đa 5MB).");
-            return null;
-        }
-
-        const me = (currentUsername || localStorage.getItem("zchat_username") || "guest")
-            .trim()
-            .replace(/[^a-zA-Z0-9_-]/g, "_");
-        const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-        const path = `${me}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-        try {
-            const { data, error } = await window.supabaseClient.storage
-                .from("chat-images")
-                .upload(path, file, {
-                    cacheControl: "3600",
-                    upsert: false,
-                    contentType: file.type || "image/jpeg",
-                });
-
-            if (error) {
-                console.error("[ZChat] Storage upload error:", error);
-                alert("Upload ảnh thất bại: " + (error.message || "unknown"));
-                return null;
-            }
-
-            const { data: pub } = window.supabaseClient.storage
-                .from("chat-images")
-                .getPublicUrl(data.path || path);
-
-            const url = pub && pub.publicUrl ? pub.publicUrl : null;
-            if (!url) {
-                console.error("[ZChat] Không lấy được public URL");
-                return null;
-            }
-            console.log("[ZChat] Ảnh đã upload:", url);
-            return url;
-        } catch (err) {
-            console.error("[ZChat] uploadChatImage exception:", err);
-            alert("Upload ảnh lỗi kết nối.");
-            return null;
-        }
-    }
-
     if (fileInput) {
-        try {
-            fileInput.setAttribute("accept", "image/*");
-        } catch (_) {}
-
         fileInput.addEventListener("change", async (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
@@ -1662,54 +1617,47 @@
             if (!chat) return;
 
             if (file.type.startsWith("image/")) {
-                const tempId = uid("m");
-                const pending = {
-                    id: tempId,
-                    senderId: "me",
-                    text: "⏳ Đang gửi ảnh...",
-                    createdAt: Date.now(),
-                    status: "sending",
-                };
-                chat.messages.push(pending);
-                renderMessages(chat);
-
-                const imageUrl = await uploadChatImage(file);
-                chat.messages = chat.messages.filter((m) => m.id !== tempId);
-
-                if (imageUrl) {
-                    const msg = {
-                        id: uid("m"),
-                        senderId: "me",
-                        text: `[IMAGE]:${imageUrl}`,
-                        createdAt: Date.now(),
-                        status: "sending",
-                    };
-                    chat.messages.push(msg);
-                    postMessageToSupabase(msg, chat.id);
-                    scheduleDisappearing(chat, msg);
-                    renderMessages(chat);
-                    renderChatList();
-                    setTimeout(() => {
-                        msg.status = "delivered";
-                        if (state.activeChatId === chat.id) renderMessages(chat);
-                    }, 600);
+                if (typeof uploadChatImage === "function") {
+                    const imageUrl = await uploadChatImage(file);
+                    if (imageUrl) {
+                        const msg = {
+                            id: uid("m"),
+                            senderId: "me",
+                            text: `[IMAGE]:${imageUrl}`,
+                            createdAt: Date.now(),
+                            status: "sending"
+                        };
+                        chat.messages.push(msg);
+                        postMessageToSupabase(msg, chat.id);
+                        renderMessages(chat);
+                        renderChatList();
+                    }
                 } else {
-                    renderMessages(chat);
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const msg = {
+                            id: uid("m"),
+                            senderId: "me",
+                            text: `[IMAGE]:${evt.target.result}`,
+                            createdAt: Date.now(),
+                            status: "sending"
+                        };
+                        chat.messages.push(msg);
+                        postMessageToSupabase(msg, chat.id);
+                        renderMessages(chat);
+                        renderChatList();
+                    };
+                    reader.readAsDataURL(file);
                 }
             } else {
-                const msg = {
-                    id: uid("m"),
-                    senderId: "me",
-                    text: "",
-                    attachment: file.name,
-                    createdAt: Date.now(),
-                    status: "sending",
-                };
+                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
                 chat.messages.push(msg);
                 postMessageToSupabase(msg, chat.id);
                 scheduleDisappearing(chat, msg);
+
                 renderMessages(chat);
                 renderChatList();
+
                 setTimeout(() => {
                     msg.status = "delivered";
                     if (state.activeChatId === chat.id) renderMessages(chat);
