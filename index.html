@@ -270,62 +270,57 @@
         <!-- Mobile scrim -->
         <div id="sidebarScrim" class="hidden fixed inset-0 z-30 bg-black/60 md:hidden"></div>
 
-        <!-- Sidebar / Navigation Layout -->
-        <div id="sidebarWrap"
-             class="static z-40 flex h-full w-full md:w-[380px] md:max-w-none translate-x-0"
-             style="background-color: var(--canvas);">
-
-            <!-- Nav rail (Thanh điều hướng bên trái / Sticky dưới cùng trên mobile) -->
-            <nav class="fixed sm:static bottom-0 left-0 z-40 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0"
-                 style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
-                <div class="contents sm:flex sm:flex-col sm:items-center sm:w-full">
-                    <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
-                        <a href="index.html" aria-label="Home">
-                            <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-                                <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
-                                      fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
-                            </svg>
-                        </a>
-                    </div>
-                    <ul class="flex flex-row sm:flex-col flex-1 sm:flex-initial items-center justify-around sm:justify-start w-full sm:w-auto gap-2">
-                        <li>
-                            <button type="button" data-nav="chats" aria-label="Chats"
-                                    class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors"
-                                    style="background-color: var(--ink); color: var(--canvas);">
-                                <i data-lucide="message-circle" class="w-5 h-5"></i>
-                            </button>
-                        </li>
-                        <li>
-                            <button type="button" data-nav="contacts" aria-label="Contacts"
-                                    class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
-                                    style="color: var(--muted);">
-                                <i data-lucide="users" class="w-5 h-5"></i>
-                            </button>
-                        </li>
-                        <li>
-                            <a href="settings.html" aria-label="Settings"
-                               class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
-                               style="color: var(--muted);">
-                                <i data-lucide="settings" class="w-5 h-5"></i>
-                            </a>
-                        </li>
-                    </ul>
+        <!-- Nav rail — sticky bottom trên mobile (đồng bộ settings.html), cột trái trên desktop -->
+        <nav class="fixed sm:static bottom-0 left-0 z-50 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0"
+             style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
+            <div class="contents sm:flex sm:flex-col sm:items-center sm:w-full">
+                <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
+                    <a href="index.html" aria-label="Home">
+                        <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                            <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                                  fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
                 </div>
+                <ul class="flex flex-row sm:flex-col flex-1 sm:flex-initial items-center justify-around sm:justify-start w-full sm:w-auto gap-2">
+                    <li>
+                        <button type="button" data-nav="chats" aria-label="Chats"
+                                class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors"
+                                style="background-color: var(--ink); color: var(--canvas);">
+                            <i data-lucide="message-circle" class="w-5 h-5"></i>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" data-nav="contacts" aria-label="Contacts"
+                                class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                        </button>
+                    </li>
+                    <li>
+                        <a href="settings.html" aria-label="Settings"
+                           class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                           style="color: var(--muted);">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <a href="profile.html" id="profileBtn" aria-label="Profile"
+               class="hidden sm:flex rounded-full items-center justify-center shrink-0">
+                <div id="profileAvatar"
+                     class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
+            </a>
+        </nav>
 
-                <!-- Profile Button (PC: góc dưới trái, Mobile: ẩn ở bottom bar) -->
-                <a href="profile.html" id="profileBtn" aria-label="Profile"
-                   class="hidden sm:flex rounded-full items-center justify-center shrink-0">
-                    <div id="profileAvatar"
-                         class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
-                </a>
-            </nav>
-
-            <!-- Chat list panel -->
-            <div class="flex min-w-0 flex-1 flex-col"
+        <!-- Chat list (mobile: full-width overlay; desktop: cột 380px) -->
+        <div id="sidebarWrap"
+             class="fixed md:static inset-x-0 top-0 bottom-[60px] md:bottom-0 md:inset-y-0 left-0 z-40 flex h-auto md:h-full w-full md:w-[380px] md:max-w-none transition-transform duration-200 translate-x-0"
+             style="background-color: var(--canvas);">
+            <div class="flex min-w-0 flex-1 flex-col h-full"
                  style="border-right: 1px solid var(--hairline); background-color: var(--surface);">
                 <div class="flex items-center justify-between gap-3 px-4 pb-3 pt-5">
                     <div class="flex items-center gap-3">
-                        <!-- Profile Button trên Mobile (góc trên bên trái) -->
                         <a href="profile.html" aria-label="Profile" class="flex md:hidden rounded-full items-center justify-center shrink-0">
                             <div id="profileAvatarMobile" class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color: var(--elevated); color: var(--ink);"></div>
                         </a>
@@ -338,7 +333,7 @@
                             <i data-lucide="square-pen" class="w-[18px] h-[18px]"></i>
                         </button>
                         <button type="button" id="closeSidebarBtn" aria-label="Close sidebar"
-                                class="hidden flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated md:hidden"
+                                class="hidden h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated md:hidden"
                                 style="color: var(--muted);">
                             <i data-lucide="x" class="w-[18px] h-[18px]"></i>
                         </button>
@@ -364,8 +359,8 @@
             </div>
         </div>
 
-        <!-- Main panel -->
-        <div id="mainPanel" class="hidden md:flex min-w-0 flex-1 flex-col relative" style="background-color: var(--canvas);">
+        <!-- Main panel — luôn có trên mobile để mở chat khi chọn -->
+        <div id="mainPanel" class="flex min-w-0 flex-1 flex-col relative h-full" style="background-color: var(--canvas);">
 
             <!-- Empty state -->
             <div id="emptyState" class="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
