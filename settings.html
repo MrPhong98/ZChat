@@ -46,38 +46,40 @@
 </head>
 
 <body class="h-full font-body overflow-hidden">
-<div class="flex flex-col sm:flex-row h-screen w-full overflow-hidden" style="background-color: var(--canvas);">
+<div class="flex flex-col sm:flex-row h-screen w-full overflow-hidden pb-[60px] sm:pb-0" style="background-color: var(--canvas);">
 
-    <!-- Nav Rail (Thanh điều hướng bên trái / dưới cùng trên mobile) -->
-    <nav class="order-last sm:order-first flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-start sm:py-5 px-4 sm:px-0" style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
-        <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
-            <a href="index.html" aria-label="Home">
-                <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-                    <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
-                          fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round" />
-                </svg>
-            </a>
+    <!-- Nav Rail (Thanh điều hướng bên trái / Sticky dưới cùng trên mobile) -->
+    <nav class="fixed sm:static bottom-0 left-0 z-40 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0" style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
+        <div class="contents sm:flex sm:flex-col sm:items-center sm:w-full">
+            <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
+                <a href="index.html" aria-label="Home">
+                    <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                        <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                              fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round" />
+                    </svg>
+                </a>
+            </div>
+            <ul class="flex flex-row sm:flex-col flex-1 sm:flex-initial items-center justify-around sm:justify-start w-full sm:w-auto gap-2">
+                <li>
+                    <a href="index.html" aria-label="Chats" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
+                        <i data-lucide="message-circle" class="w-5 h-5"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" aria-label="Contacts" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
+                        <i data-lucide="users" class="w-5 h-5"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="settings.html" aria-label="Settings" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors" style="background-color: var(--ink); color: var(--canvas);">
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                    </a>
+                </li>
+            </ul>
         </div>
-        <ul class="flex flex-row sm:flex-col flex-1 sm:flex-initial items-center justify-around sm:justify-start w-full sm:w-auto gap-2">
-            <li>
-                <a href="index.html" aria-label="Chats" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
-                    <i data-lucide="message-circle" class="w-5 h-5"></i>
-                </a>
-            </li>
-            <li>
-                <a href="#" aria-label="Contacts" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
-                    <i data-lucide="users" class="w-5 h-5"></i>
-                </a>
-            </li>
-            <li>
-                <a href="settings.html" aria-label="Settings" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors" style="background-color: var(--ink); color: var(--canvas);">
-                    <i data-lucide="settings" class="w-5 h-5"></i>
-                </a>
-            </li>
-        </ul>
 
-        <!-- Profile Button -->
-        <a href="profile.html" id="profileBtn" aria-label="Profile" class="hidden sm:flex rounded-full items-center justify-center">
+        <!-- Profile Button (Ẩn trên mobile trong thanh bottom tab bar nếu muốn, hoặc giữ nguyên dưới góc trái PC) -->
+        <a href="profile.html" id="profileBtn" aria-label="Profile" class="hidden sm:flex rounded-full items-center justify-center shrink-0">
             <div id="profileAvatar" class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
         </a>
     </nav>
