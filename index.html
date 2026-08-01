@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ZChat — Private &amp; Encrypted Messenger</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+          rel="stylesheet">
+    <link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="any"/>
+    <link rel="icon" href="/assets/img/favicon-16.png" type="image/png" sizes="any"/>
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png"/>
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        canvas: "var(--canvas)",
+                        surface: "var(--surface)",
+                        elevated: "var(--elevated)",
+                        elevated2: "var(--elevated2)",
+                        hairline: "var(--hairline)",
+                        ink: "var(--ink)",
+                        muted: "var(--muted)",
+                        faint: "var(--faint)",
+                        online: "var(--online)",
+                    },
+                    fontFamily: {
+                        display: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        pill: "999px",
+                        bubble: "20px",
+                    },
+                    keyframes: {
+                        "fade-in": {
+                            "0%": {opacity: 0, transform: "translateY(4px)"},
+                            "100%": {opacity: 1, transform: "translateY(0)"},
+                        },
+                        "typing-dot": {
+                            "0%, 60%, 100%": {transform: "translateY(0)", opacity: 0.4},
+                            "30%": {transform: "translateY(-3px)", opacity: 1},
+                        },
+                    },
+                    animation: {
+                        "fade-in": "fade-in .18s ease-out",
+                        "typing-dot": "typing-dot 1.2s ease-in-out infinite",
+                    },
+                },
+            },
+        };
+    </script>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+
+<body class="h-full font-body" style="background-color: var(--canvas); color: var(--ink);">
+
+<!-- Custom toast for screenshot block -->
+<div id="zchatToast" role="alert" aria-live="assertive"></div>
+
+<!-- ============ ONBOARDING SCREEN ============ -->
+<div id="onboarding" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-2 px-6"
+     style="background-color: var(--canvas); color: var(--ink);">
+    <div class="mb-2">
+        <svg width="72" height="72" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"
+             aria-hidden="true">
+            <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                  fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+        </svg>
+    </div>
+    <h1 id="onboardingTitle" class="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-center">Welcome
+        to ZChat</h1>
+    <p id="onboardingDesc" class="text-center mb-8" style="color: var(--muted);">Private &amp; Encrypted Messenger</p>
+
+    <!-- REGISTER VIEW -->
+    <form id="onboardingForm" class="w-full max-w-xs flex flex-col items-center gap-4" autocomplete="off">
+        <label for="usernameInput" id="lblEnterUsername" class="text-sm w-full text-center font-medium">Enter
+            username:</label>
+        <input
+                id="usernameInput"
+                type="text"
+                maxlength="24"
+                placeholder="e.g. @alex"
+                class="w-full rounded-pill px-5 py-3 text-center focus:outline-none font-medium"
+                style="background-color: var(--elevated); color: var(--ink);"
+                autofocus
+        />
+        <p id="usernameError" class="hidden text-xs text-red-500 font-medium">Please enter a username to continue.</p>
+        <button
+                type="submit"
+                id="createAccountBtn"
+                class="w-full rounded-pill px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+                style="background-color: var(--ink); color: var(--canvas);"
+        >
+            Create new account
+        </button>
+        <p class="text-sm text-center mt-1" style="color: var(--muted);">
+            <span id="txtHaveAccount">Already have an account?</span>
+            <button type="button" id="switchToLoginBtn"
+                    class="font-semibold underline underline-offset-2 hover:opacity-80" style="color: var(--ink);">Login
+            </button>
+        </p>
+    </form>
+
+    <!-- LOGIN VIEW -->
+    <form id="loginForm" class="hidden w-full max-w-xs flex flex-col items-center gap-4" autocomplete="off">
+        <label for="loginUsernameInput" id="lblLoginUsername"
+               class="text-sm w-full text-center font-medium">Username</label>
+        <input
+                id="loginUsernameInput"
+                type="text"
+                maxlength="24"
+                placeholder="e.g. @alex"
+                class="w-full rounded-pill px-5 py-3 text-center focus:outline-none font-medium"
+                style="background-color: var(--elevated); color: var(--ink);"
+        />
+        <label for="loginRecoveryInput" id="lblRecoveryPassword" class="text-sm w-full text-center font-medium">Recovery
+            Password</label>
+        <div class="relative w-full">
+            <input
+                    id="loginRecoveryInput"
+                    type="password"
+                    maxlength="32"
+                    placeholder="zChat-xxxx-xxxx"
+                    class="w-full rounded-pill px-5 py-3 pr-12 text-center focus:outline-none font-medium"
+                    style="background-color: var(--elevated); color: var(--ink);"
+            />
+            <button type="button" id="toggleRecoveryVisibility"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                    style="color: var(--muted);" aria-label="Toggle password visibility">
+                <i data-lucide="eye" class="w-4 h-4" id="recoveryEyeIcon"></i>
+            </button>
+        </div>
+        <p id="loginError" class="hidden text-xs text-red-500 font-medium text-center"></p>
+        <button
+                type="submit"
+                id="loginBtn"
+                class="w-full rounded-pill px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+                style="background-color: var(--ink); color: var(--canvas);"
+        >
+            Enter Chat
+        </button>
+        <p class="text-sm text-center mt-1" style="color: var(--muted);">
+            <span id="txtNoAccount">Don't have an account?</span>
+            <button type="button" id="switchToRegisterBtn"
+                    class="font-semibold underline underline-offset-2 hover:opacity-80" style="color: var(--ink);">
+                Create one
+            </button>
+        </p>
+    </form>
+</div>
+
+<!-- ============ RECOVERY PASSWORD MODAL ============ -->
+<div id="recoveryModal"
+     class="hidden fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm fade-in">
+    <div class="w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-5"
+         style="background-color: var(--surface); border: 1px solid var(--hairline); color: var(--ink);">
+        <div class="flex flex-col items-center gap-2 text-center">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full mb-1"
+                 style="background-color: rgba(16,185,129,0.15); color: #10b981;">
+                <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <h3 id="recoveryModalTitle" class="font-display text-lg font-bold">Account created!</h3>
+            <p id="recoveryModalDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Save your Recovery
+                Password. You will need it to log in again.</p>
+        </div>
+        <div class="rounded-2xl p-4 flex flex-col gap-2"
+             style="background-color: var(--canvas); border: 1px solid var(--hairline);">
+            <p id="recoveryModalLabel" class="text-[11px] font-semibold uppercase tracking-wider"
+               style="color: var(--faint);">Recovery Password</p>
+            <div class="flex items-center gap-2">
+                <code id="recoveryPasswordDisplay" class="flex-1 text-sm font-bold tracking-wide break-all select-all"
+                      style="color: var(--ink);"></code>
+                <button type="button" id="copyRecoveryBtn"
+                        class="shrink-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                        style="color: var(--muted);" aria-label="Copy">
+                    <span id="copyIconWrapper">
+                        <i data-lucide="copy" class="w-4 h-4" id="copyRecoveryIcon"></i>
+                    </span>
+                </button>
+            </div>
+        </div>
+        <p id="recoveryModalWarn" class="text-[11px] text-center leading-relaxed" style="color: var(--muted);">This
+            password is only shown once. Store it somewhere safe.</p>
+        <button type="button" id="recoveryContinueBtn"
+                class="w-full rounded-pill px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+                style="background-color: var(--ink); color: var(--canvas);">
+            Continue to Chat
+        </button>
+    </div>
+</div>
+
+<!-- ============ CUSTOM NEW CHAT MODAL ============ -->
+<div id="newChatModal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm fade-in">
+    <div class="w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4"
+         style="background-color: var(--surface); border: 1px solid var(--hairline); color: var(--ink);">
+        <div class="flex items-center justify-between">
+            <h3 class="font-display text-lg font-bold">New Conversation</h3>
+            <button type="button" id="closeModalBtn"
+                    class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                    style="color: var(--muted);">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <p class="text-xs" style="color: var(--muted);">Enter the name or username of the person you want to chat
+            with:</p>
+        <form id="newChatForm" class="flex flex-col gap-4" autocomplete="off">
+            <input
+                    id="newChatNameInput"
+                    type="text"
+                    placeholder="Search or enter username..."
+                    class="w-full rounded-pill px-4 py-2.5 text-sm font-medium focus:outline-none"
+                    style="background-color: var(--elevated); color: var(--ink);"
+            />
+            <div class="flex justify-end gap-2">
+                <button type="button" id="cancelModalBtn"
+                        class="rounded-pill px-4 py-2 text-xs font-semibold transition-colors hover:bg-elevated"
+                        style="color: var(--muted);">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="rounded-pill px-5 py-2 text-xs font-semibold transition-opacity hover:opacity-90"
+                        style="background-color: var(--ink); color: var(--canvas);">
+                    Start Chat
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============ CUSTOM CONFIRM MODAL ============ -->
+<div id="confirmModal"
+     class="hidden fixed inset-0 z-[70] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm fade-in">
+    <div class="w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4"
+         style="background-color: var(--surface); border: 1px solid var(--hairline); color: var(--ink);">
+        <div class="flex flex-col items-center gap-2 text-center">
+            <div class="flex h-12 w-12 items-center justify-center rounded-full mb-1 bg-red-500/10 text-red-500">
+                <i data-lucide="trash-2" class="w-6 h-6"></i>
+            </div>
+            <h3 id="confirmModalTitle" class="font-display text-lg font-bold">Delete Message</h3>
+            <p id="confirmModalDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Are you sure you want to delete this message?</p>
+        </div>
+        <div class="flex items-center gap-2 pt-2">
+            <button type="button" id="cancelConfirmBtn"
+                    class="flex-1 rounded-pill px-4 py-2.5 text-xs font-semibold transition-colors hover:bg-elevated text-center"
+                    style="color: var(--muted); border: 1px solid var(--hairline);">
+                Cancel
+            </button>
+            <button type="button" id="okConfirmBtn"
+                    class="flex-1 rounded-pill px-4 py-2.5 text-xs font-semibold transition-opacity hover:opacity-90 bg-red-600 text-white text-center">
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell" class="hidden h-screen w-full overflow-hidden" style="background-color: var(--canvas);">
+    <main class="flex h-full w-full overflow-hidden relative">
+
+        <!-- Mobile scrim -->
+        <div id="sidebarScrim" class="hidden fixed inset-0 z-30 bg-black/60 md:hidden"></div>
+
+        <!-- Sidebar -->
+        <div id="sidebarWrap"
+             class="fixed inset-y-0 left-0 z-40 flex h-full w-[86%] max-w-[360px] -translate-x-full transition-transform duration-200 md:static md:w-[380px] md:max-w-none md:translate-x-0"
+             style="background-color: var(--canvas);">
+
+            <!-- Nav rail -->
+            <nav class="flex h-full w-[72px] shrink-0 flex-col items-center py-5"
+                 style="border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
+                <div class="mb-6 flex h-9 w-9 items-center justify-center">
+                    <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                        <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                              fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <ul class="flex flex-1 flex-col items-center gap-2">
+                    <li>
+                        <button type="button" data-nav="chats" aria-label="Chats"
+                                class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors"
+                                style="background-color: var(--ink); color: var(--canvas);">
+                            <i data-lucide="message-circle" class="w-5 h-5"></i>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" data-nav="contacts" aria-label="Contacts"
+                                class="nav-btn flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="users" class="w-5 h-5"></i>
+                        </button>
+                    </li>
+                    <li>
+                        <a href="settings.html" aria-label="Settings"
+                           class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                           style="color: var(--muted);">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Profile Button -->
+                <a href="profile.html" id="profileBtn" aria-label="Profile"
+                   class="rounded-full flex items-center justify-center">
+                    <div id="profileAvatar"
+                         class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
+                </a>
+            </nav>
+
+            <!-- Chat list panel -->
+            <div class="flex min-w-0 flex-1 flex-col"
+                 style="border-right: 1px solid var(--hairline); background-color: var(--surface);">
+                <div class="flex items-center justify-between gap-3 px-4 pb-3 pt-5">
+                    <h1 class="font-display text-xl font-extrabold tracking-tight" style="color: var(--ink);">Chat</h1>
+                    <div class="flex items-center gap-1">
+                        <button type="button" id="newChatIconBtn" aria-label="New chat"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="square-pen" class="w-[18px] h-[18px]"></i>
+                        </button>
+                        <button type="button" id="closeSidebarBtn" aria-label="Close sidebar"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated md:hidden"
+                                style="color: var(--muted);">
+                            <i data-lucide="x" class="w-[18px] h-[18px]"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="px-4 pb-3">
+                    <div class="flex items-center gap-2 rounded-pill px-4 py-2.5 transition-colors"
+                         style="background-color: var(--elevated);">
+                        <i data-lucide="search" class="w-[17px] h-[17px] shrink-0" style="color: var(--faint);"></i>
+                        <input id="searchInput" type="text" placeholder="Search conversations"
+                               class="w-full bg-transparent text-sm focus:outline-none" style="color: var(--ink);"/>
+                    </div>
+                </div>
+
+                <div id="chatListEmpty"
+                     class="hidden flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                    <i data-lucide="message-circle" class="w-7 h-7" style="color: var(--faint);"></i>
+                    <p class="text-sm" style="color: var(--muted);">No conversations match your search</p>
+                </div>
+
+                <div id="chatList" class="flex-1 space-y-0.5 overflow-y-auto scrollbar-thin px-2 pb-4"></div>
+            </div>
+        </div>
+
+        <!-- Main panel -->
+        <div id="mainPanel" class="flex min-w-0 flex-1 flex-col relative" style="background-color: var(--canvas);">
+
+            <!-- Empty state -->
+            <div id="emptyState" class="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+                <svg width="72" height="72" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                    <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                          fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+                </svg>
+                <div class="space-y-1">
+                    <h2 class="font-display text-2xl font-extrabold tracking-tight" style="color: var(--ink);">Start
+                        conversation</h2>
+                    <p class="text-sm" style="color: var(--muted);">Pick a chat from the list, or start a new one.</p>
+                </div>
+                <button type="button" id="newChatEmptyBtn"
+                        class="rounded-pill px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                        style="background-color: var(--ink); color: var(--canvas);">
+                    New chat
+                </button>
+            </div>
+
+            <!-- Active chat -->
+            <div id="activeChat" class="hidden flex-1 flex-col min-w-0">
+                <!-- Header -->
+                <header class="flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
+                        style="border-bottom: 1px solid var(--hairline);">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <button type="button" id="openSidebarBtn" aria-label="Open conversations"
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-elevated md:hidden"
+                                style="color: var(--muted);">
+                            <i data-lucide="menu" class="w-[19px] h-[19px]"></i>
+                        </button>
+                        <div id="chatHeaderAvatar" class="relative shrink-0"></div>
+                        <div class="min-w-0">
+                            <p id="chatHeaderName" class="truncate text-[15px] font-bold"
+                               style="color: var(--ink);"></p>
+                            <p id="chatHeaderStatus" class="truncate text-xs" style="color: var(--muted);"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" aria-label="Voice call"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="phone" class="w-[18px] h-[18px]"></i>
+                        </button>
+                        <button type="button" aria-label="Video call"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="video" class="w-[18px] h-[18px]"></i>
+                        </button>
+                        <button type="button" aria-label="Search in conversation"
+                                class="hidden sm:flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="search" class="w-[18px] h-[18px]"></i>
+                        </button>
+                        <button type="button" id="openInfoBtn" aria-label="Conversation details"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="info" class="w-[18px] h-[18px]"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Messages Feed -->
+                <div id="messageFeed" class="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-4 py-5 sm:px-8"></div>
+
+                <!-- Composer -->
+                <div class="px-4 py-3 sm:px-6 relative" style="border-top: 1px solid var(--hairline);">
+                    <div id="emojiPopover"
+                         class="hidden absolute bottom-full right-4 mb-2 grid grid-cols-6 gap-1 rounded-2xl p-2 shadow-lg"
+                         style="background-color: var(--elevated);"></div>
+
+                    <!-- GIAO DIỆN EDIT BAR ĐẸP MẮT -->
+                    <div id="editBar" class="hidden flex items-center justify-between pb-2 mb-1 px-2 border-b border-hairline text-xs fade-in">
+                        <div class="flex items-center gap-2 overflow-hidden">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5 shrink-0" style="color: var(--muted);"></i>
+                            <span class="font-semibold text-muted shrink-0">Editing message:</span>
+                            <span id="editBarPreview" class="truncate font-medium text-ink opacity-80"></span>
+                        </div>
+                        <button type="button" id="cancelEditBtn" class="p-1 hover:bg-elevated2 rounded-full transition-colors shrink-0" style="color: var(--muted);" title="Cancel edit">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex items-end gap-2 rounded-[26px] px-2 py-2"
+                         style="background-color: var(--elevated);">
+                        <button type="button" id="attachBtn" aria-label="Attach file"
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                style="color: var(--muted);">
+                            <i data-lucide="paperclip" class="w-[19px] h-[19px]"></i>
+                        </button>
+                        <input type="file" id="fileInput" class="hidden"/>
+
+                        <textarea
+                                id="messageInput"
+                                rows="1"
+                                placeholder="Write a message..."
+                                class="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
+                                style="color: var(--ink);"
+                        ></textarea>
+
+                        <button type="button" id="emojiBtn" aria-label="Emoji picker"
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                style="color: var(--muted);">
+                            <i data-lucide="smile" class="w-[19px] h-[19px]"></i>
+                        </button>
+
+                        <button type="button" id="sendBtn" aria-label="Send message" disabled
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
+                                style="background-color: var(--ink); color: var(--canvas);">
+                            <i id="sendIcon" data-lucide="send-horizontal" class="w-[17px] h-[17px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ CONTACT INFO POPUP MODAL ============ -->
+            <div id="infoDrawer"
+                 class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md fade-in">
+                <div class="w-full max-w-sm rounded-3xl shadow-2xl flex flex-col overflow-visible"
+                     style="background-color: var(--surface); border: 1px solid var(--transparent-border); color: var(--ink);">
+
+                    <!-- Popup Header -->
+                    <div class="flex items-center justify-between px-5 py-4"
+                         style="border-bottom: 1px solid var(--hairline);">
+                        <h3 id="infoDrawerTitle" class="font-display text-base font-bold">Contact Info</h3>
+                        <button type="button" id="closeInfoBtn"
+                                class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                                style="color: var(--muted);">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Popup Content -->
+                    <div class="p-6 flex flex-col items-center gap-6">
+                        <!-- Avatar & Info -->
+                        <div class="flex flex-col items-center gap-2 text-center">
+                            <div id="infoAvatar" class="relative"></div>
+                            <div>
+                                <h4 id="infoName" class="font-display text-lg font-extrabold"
+                                    style="color: var(--ink);"></h4>
+                                <p id="infoUsername" class="text-xs font-medium" style="color: var(--muted);"></p>
+                            </div>
+                        </div>
+
+                        <!-- Options Card -->
+                        <div class="w-full rounded-2xl p-4 space-y-4"
+                             style="background-color: var(--canvas); border: 1px solid var(--hairline);">
+
+                            <!-- Disappearing Message Option -->
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="timer" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
+                                    <div>
+                                        <p id="disappearingTitle" class="text-xs font-bold" style="color: var(--ink);">
+                                            Disappearing messages</p>
+                                        <p id="disappearingDesc" class="text-[11px]" style="color: var(--muted);">Auto
+                                            delete after time</p>
+                                    </div>
+                                </div>
+                                <div class="relative shrink-0" id="disappearingDropdownContainer" style="z-index: 60;">
+                                    <button type="button" id="disappearingMenuBtn"
+                                            class="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all border"
+                                            style="background-color: var(--elevated); border-color: var(--transparent-border); color: var(--ink);">
+                                        <i data-lucide="timer" class="w-3.5 h-3.5" id="disappearingActiveIcon"
+                                           style="display: none; color: #10b981;"></i>
+                                        <span id="currentDisappearingLabel">Off</span>
+                                        <i data-lucide="chevron-down"
+                                           class="w-3.5 h-3.5 transition-transform duration-200"
+                                           id="disappearingChevron"></i>
+                                    </button>
+
+                                    <div id="disappearingMenuPopup"
+                                         class="hidden absolute right-0 bottom-full mb-2 w-48 rounded-2xl p-2 shadow-2xl fade-in"
+                                         style="background-color: var(--elevated2); border: 1px solid var(--transparent-border); z-index: 70;">
+                                        <button type="button" data-value="off"
+                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                style="color: var(--ink);">
+                                            <span class="flex items-center gap-2.5">
+                                                <i data-lucide="ban" class="w-3.5 h-3.5 opacity-60"></i>
+                                                <span class="opt-label">Off</span>
+                                            </span>
+                                            <i data-lucide="check"
+                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                        </button>
+                                        <button type="button" data-value="10s"
+                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                style="color: var(--ink);">
+                                            <span class="flex items-center gap-2.5">
+                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
+                                                <span class="opt-label">10 seconds</span>
+                                            </span>
+                                            <i data-lucide="check"
+                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                        </button>
+                                        <button type="button" data-value="1m"
+                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                style="color: var(--ink);">
+                                            <span class="flex items-center gap-2.5">
+                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
+                                                <span class="opt-label">1 minute</span>
+                                            </span>
+                                            <i data-lucide="check"
+                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                        </button>
+                                        <button type="button" data-value="10m"
+                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                style="color: var(--ink);">
+                                            <span class="flex items-center gap-2.5">
+                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
+                                                <span class="opt-label">10 minutes</span>
+                                            </span>
+                                            <i data-lucide="check"
+                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                        </button>
+                                        <button type="button" data-value="24h"
+                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                style="color: var(--ink);">
+                                            <span class="flex items-center gap-2.5">
+                                                <i data-lucide="clock" class="w-3.5 h-3.5 opacity-60"></i>
+                                                <span class="opt-label">24 hours</span>
+                                            </span>
+                                            <i data-lucide="check"
+                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px solid var(--hairline);"></div>
+
+                            <!-- Block Screenshots Option -->
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="shield-alert" class="w-5 h-5 shrink-0"
+                                       style="color: var(--muted);"></i>
+                                    <div>
+                                        <p id="blockScreenshotsTitle" class="text-xs font-bold"
+                                           style="color: var(--ink);">Block Screenshots</p>
+                                        <p id="blockScreenshotsDesc" class="text-[11px]" style="color: var(--muted);">
+                                            Prevent screen capture</p>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                    <input type="checkbox" id="blockScreenshotsToggle" class="sr-only peer">
+                                    <div class="w-10 h-6 rounded-full transition-colors peer-focus:outline-none"
+                                         style="background-color: var(--elevated2);"></div>
+                                    <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-4"></div>
+                                </label>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

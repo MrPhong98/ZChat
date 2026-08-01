@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings — ZChat</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="any" />
+    <link rel="icon" href="/assets/img/favicon-16.png" type="image/png" sizes="any" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        canvas: "var(--canvas)",
+                        surface: "var(--surface)",
+                        elevated: "var(--elevated)",
+                        elevated2: "var(--elevated2)",
+                        hairline: "var(--hairline)",
+                        ink: "var(--ink)",
+                        muted: "var(--muted)",
+                        faint: "var(--faint)",
+                        online: "var(--online)",
+                    },
+                    fontFamily: {
+                        display: ["Manrope", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        pill: "999px",
+                        bubble: "20px",
+                    }
+                },
+            },
+        };
+    </script>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+
+<body class="h-full font-body overflow-hidden">
+<div class="flex h-screen w-full overflow-hidden" style="background-color: var(--canvas);">
+
+    <!-- Nav Rail (Thanh điều hướng bên trái) -->
+    <nav class="flex h-full w-[72px] shrink-0 flex-col items-center py-5" style="border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
+        <div class="mb-6 flex h-9 w-9 items-center justify-center">
+            <a href="index.html" aria-label="Home">
+                <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                    <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                          fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round" />
+                </svg>
+            </a>
+        </div>
+        <ul class="flex flex-1 flex-col items-center gap-2">
+            <li>
+                <a href="index.html" aria-label="Chats" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
+                    <i data-lucide="message-circle" class="w-5 h-5"></i>
+                </a>
+            </li>
+            <li>
+                <a href="#" aria-label="Contacts" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated" style="color: var(--muted);">
+                    <i data-lucide="users" class="w-5 h-5"></i>
+                </a>
+            </li>
+            <li>
+                <a href="settings.html" aria-label="Settings" class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors" style="background-color: var(--ink); color: var(--canvas);">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </a>
+            </li>
+        </ul>
+
+        <!-- Profile Button -->
+        <a href="profile.html" id="profileBtn" aria-label="Profile" class="rounded-full flex items-center justify-center">
+            <div id="profileAvatar" class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
+        </a>
+    </nav>
+
+    <!-- Main Settings Layout -->
+    <div class="flex-1 overflow-y-auto scrollbar-thin">
+        <main class="mx-auto max-w-3xl px-6 py-10 sm:px-10">
+
+            <!-- Header section -->
+            <header class="mb-10 pb-6" style="border-bottom: 1px solid var(--hairline);">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl" style="background-color: var(--elevated); color: var(--ink);">
+                        <i data-lucide="settings" class="w-5 h-5"></i>
+                    </div>
+                    <h1 id="txtTitle" class="font-display text-3xl font-extrabold tracking-tight" style="color: var(--ink);">Settings</h1>
+                </div>
+                <p id="txtSubtitle" class="text-sm pl-13" style="color: var(--muted);">Manage your application preferences, privacy, and active status.</p>
+            </header>
+
+            <div class="space-y-8">
+
+                <!-- 1. PRIVACY & CALLS -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2 px-1">
+                        <i data-lucide="shield-check" class="w-4 h-4" style="color: var(--faint);"></i>
+                        <h2 id="secPrivacyTitle" class="text-xs font-bold uppercase tracking-wider" style="color: var(--faint);">Privacy & Permissions</h2>
+                    </div>
+
+                    <div class="rounded-3xl p-6 divide-y" style="background-color: var(--surface); border: 1px solid var(--hairline); divide-color: var(--hairline);">
+
+                        <!-- Voice Calls -->
+                        <div class="flex items-center justify-between pb-5 gap-4 min-h-[64px]">
+                            <div class="space-y-1 pr-4">
+                                <p id="lblStrangerCalls" class="text-sm font-bold" style="color: var(--ink);">Allow calls from strangers</p>
+                                <p id="lblStrangerCallsDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Let people not in your contacts start voice calls with you.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 self-center">
+                                <input type="checkbox" id="toggleCalls" class="sr-only peer">
+                                <div class="w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 bg-zinc-700"></div>
+                            </label>
+                        </div>
+
+                        <!-- Video Calls -->
+                        <div class="flex items-center justify-between py-5 gap-4 min-h-[64px]">
+                            <div class="space-y-1 pr-4">
+                                <p id="lblStrangerVideo" class="text-sm font-bold" style="color: var(--ink);">Allow video calls from strangers</p>
+                                <p id="lblStrangerVideoDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Let non-contacts invite you to video conversations.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 self-center">
+                                <input type="checkbox" id="toggleVideoCalls" class="sr-only peer">
+                                <div class="w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 bg-zinc-700"></div>
+                            </label>
+                        </div>
+
+                        <!-- Message Requests -->
+                        <div class="flex items-center justify-between pt-5 gap-4 min-h-[64px]">
+                            <div class="space-y-1 pr-4">
+                                <p id="lblMsgRequests" class="text-sm font-bold" style="color: var(--ink);">Message Requests</p>
+                                <p id="lblMsgRequestsDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Filter messages from unknown users into a separate request folder.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 self-center">
+                                <input type="checkbox" id="toggleMsgRequests" class="sr-only peer" checked>
+                                <div class="w-11 h-6 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 bg-zinc-700"></div>
+                            </label>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- 2. GENERAL & PREFERENCES -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2 px-1">
+                        <i data-lucide="sliders" class="w-4 h-4" style="color: var(--faint);"></i>
+                        <h2 id="secGeneralTitle" class="text-xs font-bold uppercase tracking-wider" style="color: var(--faint);">General & Appearance</h2>
+                    </div>
+
+                    <div class="rounded-3xl p-6 divide-y" style="background-color: var(--surface); border: 1px solid var(--hairline); divide-color: var(--hairline);">
+
+                        <!-- App Language -->
+                        <div class="flex items-center justify-between pb-5 gap-4 min-h-[64px]">
+                            <div class="space-y-1 pr-4">
+                                <p id="lblLanguage" class="text-sm font-bold" style="color: var(--ink);">Language</p>
+                                <p id="lblLanguageDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Select your preferred language for the application UI.</p>
+                            </div>
+                            <select id="languageSelect" class="custom-select rounded-pill px-5 py-2.5 text-sm font-semibold focus:outline-none cursor-pointer border shadow-sm transition-all shrink-0 self-center min-w-[130px]" style="background-color: var(--elevated); color: var(--ink); border-color: var(--hairline);">
+                                <option value="en">English</option>
+                                <option value="vi">Tiếng Việt</option>
+                                <option value="zh">中文 (Chinese)</option>
+                                <option value="ru">Русский (Russian)</option>
+                            </select>
+                        </div>
+
+                        <!-- Theme Selector -->
+                        <div class="flex items-center justify-between pt-5 gap-4 min-h-[64px]">
+                            <div class="space-y-1 pr-4">
+                                <p id="lblTheme" class="text-sm font-bold" style="color: var(--ink);">Theme Mode</p>
+                                <p id="lblThemeDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Choose between Light and Dark visual appearance.</p>
+                            </div>
+                            <select id="themeSelect" class="custom-select rounded-pill px-5 py-2.5 text-sm font-semibold focus:outline-none cursor-pointer border shadow-sm transition-all shrink-0 self-center min-w-[130px]" style="background-color: var(--elevated); color: var(--ink); border-color: var(--hairline);">
+                                <option value="dark">Dark Theme</option>
+                                <option value="light">Light Theme</option>
+                            </select>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- 3. ACCOUNT SECURITY -->
+                <section class="space-y-3">
+                    <div class="flex items-center gap-2 px-1">
+                        <i data-lucide="key-round" class="w-4 h-4" style="color: var(--faint);"></i>
+                        <h2 id="secSecurityTitle" class="text-xs font-bold uppercase tracking-wider" style="color: var(--faint);">Account Security</h2>
+                    </div>
+
+                    <div class="rounded-3xl p-6" style="background-color: var(--surface); border: 1px solid var(--hairline);">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="space-y-1 min-w-0 flex-1">
+                                <p id="lblRecovery" class="text-sm font-bold" style="color: var(--ink);">Recovery Password</p>
+                                <p id="lblRecoveryDesc" class="text-xs leading-relaxed" style="color: var(--muted);">Use this password with your username to log in again.</p>
+                                <code id="settingsRecoveryDisplay" class="mt-3 inline-block text-sm font-bold tracking-wide break-all select-all rounded-xl px-3 py-2" style="background-color: var(--canvas); color: var(--ink); border: 1px solid var(--hairline);"></code>
+                            </div>
+                            <button type="button" id="settingsCopyRecoveryBtn" class="shrink-0 self-center flex items-center gap-2 rounded-pill px-4 py-2 text-xs font-semibold transition-colors hover:bg-elevated border" style="color: var(--ink); border-color: var(--hairline); background-color: var(--elevated);">
+                                <i data-lucide="copy" class="w-3.5 h-3.5" id="settingsCopyIcon"></i>
+                                <span id="settingsCopyLabel">Copy</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Save Action Button -->
+                <div class="flex items-center justify-end pt-4">
+                    <button id="saveBtn" type="button" class="rounded-pill px-8 py-3 text-xs font-bold tracking-wide transition-all shadow-md hover:opacity-90 active:scale-95" style="background-color: var(--ink); color: var(--canvas);">
+                        Save Changes
+                    </button>
+                </div>
+
+                <!-- Log out -->
+                <div class="pt-2 pb-8">
+                    <button id="logoutBtn" type="button" class="w-full rounded-pill px-8 py-3.5 text-xs font-bold tracking-wide transition-all hover:opacity-90 active:scale-[0.99] flex items-center justify-center gap-2" style="background-color: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35);">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span id="logoutBtnLabel">Log out</span>
+                    </button>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Custom Toast Notification -->
+<div id="toast" class="fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50 border" style="background-color: var(--elevated); border-color: var(--hairline); color: var(--ink);">
+    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500">
+        <i data-lucide="check" class="w-4 h-4"></i>
+    </div>
+    <span id="toastMsg" class="text-xs font-semibold">Settings updated successfully!</span>
+</div>
+
+<script src="js/settings.js"></script>
+</body>
+</html>
