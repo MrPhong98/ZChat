@@ -496,7 +496,7 @@
         // Đồng bộ avatar lên Supabase để người chat cùng cũng thấy avatar mới
         if (window.supabaseClient) {
             try {
-                const { error } = await window.supabaseClient
+                const { data: updatedRows, error } = await window.supabaseClient
                     .from("users")
                     .update({
                         avatar_type: draft.avatarType,
@@ -504,8 +504,16 @@
                         avatar_emoji: draft.avatarEmoji || null,
                         avatar_url: draft.avatarUrl || null,
                     })
-                    .eq("username", savedUsername);
-                if (error) console.error("[ZChat] Sync avatar to Supabase error:", error);
+                    .ilike("username", savedUsername)
+                    .select("username");
+
+                if (error) {
+                    console.error("[ZChat] Sync avatar to Supabase error:", error);
+                } else if (!updatedRows || updatedRows.length === 0) {
+                    console.warn(`[ZChat] Sync avatar: KHÔNG có dòng nào trong bảng "users" khớp username="${savedUsername}". Avatar chưa được lưu lên server — kiểm tra lại tên tài khoản trong bảng users.`);
+                } else {
+                    console.log("[ZChat] Sync avatar to Supabase OK:", updatedRows);
+                }
             } catch (err) {
                 console.error("[ZChat] Sync avatar to Supabase exception:", err);
             }
