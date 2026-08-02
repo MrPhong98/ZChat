@@ -382,6 +382,108 @@
         return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
     }
 
+    /* ============ ĐỒNG BỘ AVATAR NGƯỜI CHAT CÙNG (Supabase "users") ============ */
+    function applyAvatarFields(participant, row) {
+        if (!participant || !row) return;
+        participant.avatarType = row.avatar_type || "initials";
+        participant.avatarColor = row.avatar_color || null;
+        participant.avatarEmoji = row.avatar_emoji || null;
+        participant.avatarUrl = row.avatar_url || null;
+    }
+
+    async function fetchAvatarForUsername(username) {
+        if (!window.supabaseClient || !username) return null;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .ilike("username", username)
+                .maybeSingle();
+            if (error) {
+                console.error("[ZChat] fetchAvatarForUsername error:", error);
+                return null;
+            }
+            return data || null;
+        } catch (err) {
+            console.error("[ZChat] fetchAvatarForUsername exception:", err);
+            return null;
+        }
+    }
+
+    /* Lấy avatar cho tất cả participant hiện có trong state.chats, gộp 1 query cho gọn */
+    async function refreshAllParticipantAvatars() {
+        if (!window.supabaseClient) return;
+        const names = [...new Set(
+            state.chats
+                .map((c) => c.participant && c.participant.name)
+                .filter((n) => n && n !== "Saved Messages")
+        )];
+        if (!names.length) return;
+
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .in("username", names);
+
+            if (error) {
+                console.error("[ZChat] refreshAllParticipantAvatars error:", error);
+                return;
+            }
+            if (!data || !data.length) return;
+
+            const byNameLower = {};
+            data.forEach((row) => { byNameLower[row.username.toLowerCase()] = row; });
+
+            let changed = false;
+            state.chats.forEach((c) => {
+                const row = c.participant && byNameLower[(c.participant.name || "").toLowerCase()];
+                if (row) {
+                    applyAvatarFields(c.participant, row);
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                renderChatList();
+                const activeChat = state.chats.find((c) => c.id === state.activeChatId);
+                if (activeChat) renderActiveChat();
+            }
+        } catch (err) {
+            console.error("[ZChat] refreshAllParticipantAvatars exception:", err);
+        }
+    }
+
+    /* Nghe realtime khi user khác đổi avatar -> cập nhật ngay không cần reload */
+    function subscribeToUserAvatarChanges() {
+        if (!window.supabaseClient) return;
+
+        window.supabaseClient
+            .channel("zchat-users-avatar-realtime")
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "users" },
+                (payload) => {
+                    try {
+                        const row = payload.new;
+                        if (!row || !row.username) return;
+
+                        const chat = state.chats.find(
+                            (c) => c.participant && c.participant.name && c.participant.name.toLowerCase() === row.username.toLowerCase()
+                        );
+                        if (!chat) return;
+
+                        applyAvatarFields(chat.participant, row);
+                        renderChatList();
+                        if (state.activeChatId === chat.id) renderActiveChat();
+                    } catch (err) {
+                        console.error("[ZChat] Avatar realtime handler error:", err);
+                    }
+                }
+            )
+            .subscribe();
+    }
+
     let currentUsername = localStorage.getItem("zchat_username") || "";
 
     const state = {
@@ -732,11 +834,16 @@
         const statusDot = participant.online
             ? `<span class="absolute bottom-0 right-0 rounded-full border-2 bg-online" style="border-color: var(--surface); width:${dotSize}px;height:${dotSize}px"></span>`
             : "";
+
+        const innerAvatar = (participant.avatarType === "photo" && participant.avatarUrl)
+            ? `<img src="${participant.avatarUrl}" alt="${initials(participant.name)}" class="h-full w-full rounded-full object-cover select-none" />`
+            : (participant.avatarType === "emoji" && participant.avatarEmoji)
+                ? `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color: var(--elevated2);">${participant.avatarEmoji}</div>`
+                : `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color:${participant.avatarColor || colorFor(participant.name)}; color: var(--avatar-text);">${initials(participant.name)}</div>`;
+
         return `
       <div class="relative shrink-0" style="width:${size}px;height:${size}px">
-        <div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color:${colorFor(participant.name)}; color: var(--avatar-text);">
-          ${initials(participant.name)}
-        </div>
+        ${innerAvatar}
         ${statusDot}
       </div>
     `;
@@ -1430,12 +1537,13 @@
 
         let userFound = false;
         let matchedName = rawName;
+        let matchedAvatarRow = null;
 
         if (window.supabaseClient) {
             try {
                 const { data: userData, error } = await window.supabaseClient
                     .from("users")
-                    .select("username")
+                    .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
                     .ilike("username", rawName)
                     .maybeSingle();
 
@@ -1446,6 +1554,7 @@
                 if (userData && userData.username) {
                     userFound = true;
                     matchedName = userData.username;
+                    matchedAvatarRow = userData;
                 }
             } catch (err) {
                 console.error("[ZChat] Lỗi kết nối khi tìm user:", err);
@@ -1492,9 +1601,11 @@
                 blockScreenshots: false,
                 messages: []
             };
+            if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
             state.chats.unshift(chat);
         } else {
             chat.id = targetChatId; // Đồng bộ chuẩn ID
+            if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
         }
 
         state.activeChatId = chat.id;
@@ -1584,6 +1695,8 @@
             renderChatList();
             const activeChat = state.chats.find((c) => c.id === state.activeChatId);
             if (activeChat) renderMessages(activeChat);
+
+            refreshAllParticipantAvatars();
         } catch (err) {
             console.error("[ZChat] loadMessagesFromSupabase exception:", err);
         }
@@ -1759,6 +1872,13 @@
                                 messages: [],
                             };
                             state.chats.unshift(chat);
+                            fetchAvatarForUsername(otherName).then((row) => {
+                                if (row) {
+                                    applyAvatarFields(chat.participant, row);
+                                    renderChatList();
+                                    if (state.activeChatId === chat.id) renderActiveChat();
+                                }
+                            });
                         }
 
                         // Tránh trùng (tin mình vừa gửi local)
@@ -1807,5 +1927,6 @@
     }
 
     subscribeToMessages();
+    subscribeToUserAvatarChanges();
     icons();
 })();
