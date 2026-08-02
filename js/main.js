@@ -623,6 +623,54 @@
         if (window.lucide) window.lucide.createIcons();
     }
 
+    /* ============ IMAGE LIGHTBOX (xem ảnh full-screen ngay trong trang, giống Messenger) ============ */
+    function ensureImageLightbox() {
+        let overlay = document.getElementById("zchatImageLightbox");
+        if (overlay) return overlay;
+
+        overlay = document.createElement("div");
+        overlay.id = "zchatImageLightbox";
+        overlay.className = "fixed inset-0 z-[100] hidden items-center justify-center p-4";
+        overlay.style.backgroundColor = "rgba(0,0,0,0.92)";
+        overlay.innerHTML = `
+            <button type="button" id="zchatLightboxClose" aria-label="Close"
+                class="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors"
+                style="background-color: rgba(255,255,255,0.12);">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <img id="zchatLightboxImg" src="" alt="" class="max-h-[90vh] max-w-[92vw] rounded-lg object-contain select-none" />
+        `;
+        document.body.appendChild(overlay);
+
+        const close = () => {
+            overlay.classList.add("hidden");
+            overlay.classList.remove("flex");
+            const img = document.getElementById("zchatLightboxImg");
+            if (img) img.src = "";
+        };
+
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) close();
+        });
+        const closeBtn = document.getElementById("zchatLightboxClose");
+        if (closeBtn) closeBtn.addEventListener("click", close);
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !overlay.classList.contains("hidden")) close();
+        });
+
+        return overlay;
+    }
+
+    function openImageLightbox(url) {
+        if (!url) return;
+        const overlay = ensureImageLightbox();
+        const img = document.getElementById("zchatLightboxImg");
+        if (img) img.src = url;
+        overlay.classList.remove("hidden");
+        overlay.classList.add("flex");
+        icons();
+    }
+
     function syncProfileData() {
         const savedTheme = localStorage.getItem("zchat_theme") || "dark";
         document.documentElement.setAttribute("data-theme", savedTheme);
@@ -1144,10 +1192,12 @@
                 : "background-color: var(--elevated); color: var(--ink);";
 
             let contentHtml = "";
+            let isImageMsg = false;
             if (msg.text) {
                 if (msg.text.startsWith("[IMAGE]:")) {
+                    isImageMsg = true;
                     const imgUrl = msg.text.replace("[IMAGE]:", "");
-                    contentHtml = `<img src="${imgUrl}" class="rounded-2xl max-w-[260px] max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity" onclick="window.open('${imgUrl}', '_blank')" />`;
+                    contentHtml = `<img src="${imgUrl}" class="msg-image block rounded-2xl max-w-[260px] max-h-[300px] object-cover cursor-pointer hover:opacity-95 transition-opacity" data-full-src="${imgUrl}" />`;
                 } else {
                     contentHtml = escapeHtml(msg.text) + (msg.isEdited ? ` <span class="text-[10px] opacity-60 font-normal">(edited)</span>` : "");
                 }
@@ -1174,7 +1224,9 @@
             }
 
             const bubble = msg.text
-                ? `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${contentHtml}</div>`
+                ? (isImageMsg
+                    ? contentHtml
+                    : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${contentHtml}</div>`)
                 : "";
 
             const disappearingOn = chat.disappearingTime && chat.disappearingTime !== "off";
@@ -1208,6 +1260,11 @@
             const btnDelete = wrap.querySelector(".btn-delete-msg");
             if (btnDelete) {
                 btnDelete.addEventListener("click", () => deleteMessage(msg.id));
+            }
+
+            const imgEl = wrap.querySelector(".msg-image");
+            if (imgEl) {
+                imgEl.addEventListener("click", () => openImageLightbox(imgEl.dataset.fullSrc));
             }
 
             messageFeed.appendChild(wrap);
