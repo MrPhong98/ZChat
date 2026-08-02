@@ -410,7 +410,9 @@
         }
     }
 
-    /* Lấy avatar cho tất cả participant — 1 request thay vì N lần ilike */
+    /* Lấy avatar cho tất cả participant hiện có trong state.chats.
+       Dùng ilike (không phân biệt hoa/thường) từng tên một để tránh lệch case
+       giữa tên hiển thị trong chat và username thật lưu trong bảng users. */
     async function refreshAllParticipantAvatars() {
         if (!window.supabaseClient) return;
         const names = [...new Set(
@@ -421,29 +423,13 @@
         if (!names.length) return;
 
         try {
-            // Một query: or(username.ilike.A,username.ilike.B,...)
-            const orFilter = names
-                .map((n) => `username.ilike.${String(n).replace(/[,()]/g, "")}`)
-                .join(",");
-            const { data: rows, error } = await window.supabaseClient
-                .from("users")
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
-                .or(orFilter);
-            if (error) {
-                console.error("[ZChat] refreshAllParticipantAvatars error:", error);
-                return;
-            }
-            if (!rows || !rows.length) return;
-
-            const byLower = {};
-            rows.forEach((r) => {
-                if (r && r.username) byLower[r.username.toLowerCase()] = r;
-            });
+            const rows = await Promise.all(names.map((n) => fetchAvatarForUsername(n)));
 
             let changed = false;
             state.chats.forEach((c) => {
-                if (!c.participant || !c.participant.name) return;
-                const row = byLower[c.participant.name.toLowerCase()];
+                if (!c.participant) return;
+                const idx = names.findIndex((n) => n.toLowerCase() === c.participant.name.toLowerCase());
+                const row = idx > -1 ? rows[idx] : null;
                 if (row) {
                     applyAvatarFields(c.participant, row);
                     changed = true;
@@ -766,8 +752,9 @@
         applyLanguage();
         renderChatList();
 
-        // Load ngay — không delay 500ms
-        loadMessagesFromSupabase();
+        setTimeout(() => {
+            loadMessagesFromSupabase();
+        }, 500);
 
         renderActiveChat();
         icons();
@@ -908,12 +895,83 @@
     `;
     }
 
+    /* ============ PIN CONVERSATION ============ */
+    function loadPinnedChatIds() {
+        try {
+            const raw = localStorage.getItem("zchat_pinned_chats");
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr.map(String) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+    function savePinnedChatIds(ids) {
+        localStorage.setItem("zchat_pinned_chats", JSON.stringify(ids));
+    }
+    function isChatPinned(chatId) {
+        return loadPinnedChatIds().includes(String(chatId));
+    }
+    function togglePinChat(chatId) {
+        const id = String(chatId);
+        let ids = loadPinnedChatIds();
+        if (ids.includes(id)) {
+            ids = ids.filter((x) => x !== id);
+        } else {
+            ids.unshift(id);
+        }
+        savePinnedChatIds(ids);
+        renderChatList();
+    }
+    function closeChatListMenu() {
+        const existing = document.getElementById("zchatChatListMenu");
+        if (existing) existing.remove();
+        document.removeEventListener("click", closeChatListMenuOnOutside, true);
+    }
+    function closeChatListMenuOnOutside(e) {
+        const menu = document.getElementById("zchatChatListMenu");
+        if (menu && !menu.contains(e.target)) closeChatListMenu();
+    }
+    function openChatListMenu(chat, clientX, clientY) {
+        closeChatListMenu();
+        const pinned = isChatPinned(chat.id);
+        const menu = document.createElement("div");
+        menu.id = "zchatChatListMenu";
+        menu.className = "msg-action-menu fade-in";
+        menu.innerHTML = `
+            <button type="button" class="msg-action-item" data-action="pin">
+                <i data-lucide="${pinned ? "pin-off" : "pin"}" class="msg-action-icon"></i>
+                <span>${pinned ? "Unpin conversation" : "Pin conversation"}</span>
+            </button>`;
+        document.body.appendChild(menu);
+        icons();
+
+        const rect = menu.getBoundingClientRect();
+        let left = clientX;
+        let top = clientY;
+        if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+        if (top + rect.height > window.innerHeight - 8) top = window.innerHeight - rect.height - 8;
+        if (left < 8) left = 8;
+        if (top < 8) top = 8;
+        menu.style.left = left + "px";
+        menu.style.top = top + "px";
+
+        menu.querySelector('[data-action="pin"]').addEventListener("click", (e) => {
+            e.stopPropagation();
+            closeChatListMenu();
+            togglePinChat(chat.id);
+        });
+        setTimeout(() => document.addEventListener("click", closeChatListMenuOnOutside, true), 0);
+    }
+
     function getFilteredSortedChats() {
         const q = state.searchQuery.trim().toLowerCase();
         return state.chats
             .filter((c) => c.participant.name.toLowerCase().includes(q))
             .slice()
             .sort((a, b) => {
+                const ap = isChatPinned(a.id) ? 1 : 0;
+                const bp = isChatPinned(b.id) ? 1 : 0;
+                if (ap !== bp) return bp - ap;
                 const at = a.messages.length ? a.messages[a.messages.length - 1].createdAt : 0;
                 const bt = b.messages.length ? b.messages[b.messages.length - 1].createdAt : 0;
                 return bt - at;
@@ -938,10 +996,14 @@
             const isMine = last && last.senderId === "me";
             const previewText = last ? (previewForMessage(last) || (last.attachment ? "📎 Attachment" : "")) : "No messages yet";
             const active = chat.id === state.activeChatId;
+            const pinned = isChatPinned(chat.id);
             const receiptIcon =
                 isMine && last
                     ? `<i data-lucide="${last.status === "read" ? "check-check" : "check"}" class="w-[14px] h-[14px] shrink-0" style="color: var(--muted);"></i>`
                     : "";
+            const pinIcon = pinned
+                ? `<i data-lucide="pin" class="w-[12px] h-[12px] shrink-0" style="color: var(--faint);"></i>`
+                : "";
 
             const row = document.createElement("button");
             row.type = "button";
@@ -955,7 +1017,10 @@
         ${avatarHtml(chat.participant)}
         <div class="min-w-0 flex-1">
           <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}</span>
+            <span class="flex min-w-0 items-center gap-1.5 truncate">
+              ${pinIcon}
+              <span class="truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}</span>
+            </span>
             ${last ? `<span class="shrink-0 text-xs font-medium" style="color: ${chat.unread > 0 ? "var(--ink)" : "var(--faint)"};">${formatListTimestamp(last.createdAt)}</span>` : ""}
           </div>
           <div class="mt-0.5 flex items-center justify-between gap-2">
@@ -968,6 +1033,30 @@
         </div>
       `;
             row.addEventListener("click", () => selectChat(chat.id));
+            // Chuột phải (desktop)
+            row.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                openChatListMenu(chat, e.clientX, e.clientY);
+            });
+            // Nhấn giữ (mobile)
+            let pressTimer = null;
+            let longPressed = false;
+            row.addEventListener("touchstart", (e) => {
+                longPressed = false;
+                const t = e.touches[0];
+                pressTimer = setTimeout(() => {
+                    longPressed = true;
+                    openChatListMenu(chat, t.clientX, t.clientY);
+                }, 480);
+            }, { passive: true });
+            row.addEventListener("touchend", (e) => {
+                if (pressTimer) clearTimeout(pressTimer);
+                if (longPressed) e.preventDefault();
+            });
+            row.addEventListener("touchmove", () => {
+                if (pressTimer) clearTimeout(pressTimer);
+            }, { passive: true });
+
             chatList.appendChild(row);
         });
 
@@ -1972,22 +2061,19 @@
 
             if (!meLower) return;
 
-            // Chỉ cột cần + 300 tin mới nhất (nhanh hơn select *)
-            const { data: rawData, error } = await window.supabaseClient
+            // Chỉ lấy về tin nhắn thuộc các đoạn chat có liên quan đến MÌNH:
+            // Saved Messages của mình, hoặc chat_id có chứa username của mình.
+            const { data, error } = await window.supabaseClient
                 .from("messages")
-                .select("id, chat_id, sender_username, content, created_at")
+                .select("*")
                 .or(`chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
-                .order("created_at", { ascending: false })
-                .limit(300);
+                .order("created_at", { ascending: true });
 
             if (error) {
                 console.error("[ZChat] load messages error:", error.message || JSON.stringify(error));
                 return;
             }
-            if (!rawData || !rawData.length) return;
-
-            // Đảo lại thứ tự cũ → mới để render đúng
-            const data = rawData.slice().reverse();
+            if (!data || !data.length) return;
 
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
