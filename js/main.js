@@ -446,7 +446,7 @@
         }
     }
 
-    /* Nghe realtime khi user khác đổi avatar / username -> cập nhật ngay */
+    /* Nghe realtime khi user khác đổi avatar -> cập nhật ngay không cần reload */
     function subscribeToUserAvatarChanges() {
         if (!window.supabaseClient) return;
 
@@ -460,52 +460,20 @@
                         const row = payload.new;
                         if (!row || !row.username) return;
 
-                        const oldName = (payload.old && payload.old.username) || null;
-                        const newName = row.username;
-                        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
-                        let touched = false;
+                        const chat = state.chats.find(
+                            (c) => c.participant && c.participant.name && c.participant.name.toLowerCase() === row.username.toLowerCase()
+                        );
+                        if (!chat) return;
 
-                        state.chats.forEach((chat) => {
-                            if (!chat.participant || !chat.participant.name) return;
-                            const pName = chat.participant.name;
-                            const pLower = pName.toLowerCase();
-
-                            // Khớp tên cũ (đổi username) hoặc tên mới (chỉ đổi avatar)
-                            const matchedOld = oldName && pLower === String(oldName).toLowerCase();
-                            const matchedNew = pLower === String(newName).toLowerCase();
-                            if (!matchedOld && !matchedNew) return;
-
-                            if (matchedOld && newName && pLower !== String(newName).toLowerCase()) {
-                                chat.participant.name = newName;
-
-                                // Đồng bộ chat_id dạng chat_a_b theo tên mới
-                                if (chat.id && chat.id.startsWith("chat_") && me) {
-                                    const sorted = [me.toLowerCase(), newName.toLowerCase()].sort();
-                                    const newId = `chat_${sorted[0]}_${sorted[1]}`;
-                                    if (state.activeChatId === chat.id) state.activeChatId = newId;
-                                    chat.id = newId;
-                                }
-                            }
-
-                            applyAvatarFields(chat.participant, row);
-                            touched = true;
-                        });
-
-                        if (touched) {
-                            renderChatList();
-                            const active = state.chats.find((c) => c.id === state.activeChatId);
-                            if (active) renderActiveChat();
-                        }
+                        applyAvatarFields(chat.participant, row);
+                        renderChatList();
+                        if (state.activeChatId === chat.id) renderActiveChat();
                     } catch (err) {
-                        console.error("[ZChat] User profile realtime handler error:", err);
+                        console.error("[ZChat] Avatar realtime handler error:", err);
                     }
                 }
             )
-            .subscribe((status) => {
-                if (status === "SUBSCRIBED") {
-                    console.log("[ZChat] Users profile realtime OK (username/avatar)");
-                }
-            });
+            .subscribe();
     }
 
     let currentUsername = localStorage.getItem("zchat_username") || "";
