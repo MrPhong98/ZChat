@@ -475,7 +475,7 @@
         }, 3000);
     }
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const name = usernameField.value.trim();
         if (!name) {
@@ -492,6 +492,24 @@
         localStorage.setItem("zchat_avatar_emoji", draft.avatarEmoji);
         localStorage.setItem("zchat_avatar_url", draft.avatarUrl || "");
         localStorage.setItem("zchat_theme", draft.theme);
+
+        // Đồng bộ avatar lên Supabase để người chat cùng cũng thấy avatar mới
+        if (window.supabaseClient) {
+            try {
+                const { error } = await window.supabaseClient
+                    .from("users")
+                    .update({
+                        avatar_type: draft.avatarType,
+                        avatar_color: draft.avatarColor || null,
+                        avatar_emoji: draft.avatarEmoji || null,
+                        avatar_url: draft.avatarUrl || null,
+                    })
+                    .eq("username", savedUsername);
+                if (error) console.error("[ZChat] Sync avatar to Supabase error:", error);
+            } catch (err) {
+                console.error("[ZChat] Sync avatar to Supabase exception:", err);
+            }
+        }
 
         saved.username = name;
         const lang = localStorage.getItem("zchat_lang") || "en";
