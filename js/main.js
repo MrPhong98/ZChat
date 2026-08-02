@@ -410,7 +410,9 @@
         }
     }
 
-    /* Lấy avatar cho tất cả participant hiện có trong state.chats, gộp 1 query cho gọn */
+    /* Lấy avatar cho tất cả participant hiện có trong state.chats.
+       Dùng ilike (không phân biệt hoa/thường) từng tên một để tránh lệch case
+       giữa tên hiển thị trong chat và username thật lưu trong bảng users. */
     async function refreshAllParticipantAvatars() {
         if (!window.supabaseClient) return;
         const names = [...new Set(
@@ -421,23 +423,13 @@
         if (!names.length) return;
 
         try {
-            const { data, error } = await window.supabaseClient
-                .from("users")
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
-                .in("username", names);
-
-            if (error) {
-                console.error("[ZChat] refreshAllParticipantAvatars error:", error);
-                return;
-            }
-            if (!data || !data.length) return;
-
-            const byNameLower = {};
-            data.forEach((row) => { byNameLower[row.username.toLowerCase()] = row; });
+            const rows = await Promise.all(names.map((n) => fetchAvatarForUsername(n)));
 
             let changed = false;
             state.chats.forEach((c) => {
-                const row = c.participant && byNameLower[(c.participant.name || "").toLowerCase()];
+                if (!c.participant) return;
+                const idx = names.findIndex((n) => n.toLowerCase() === c.participant.name.toLowerCase());
+                const row = idx > -1 ? rows[idx] : null;
                 if (row) {
                     applyAvatarFields(c.participant, row);
                     changed = true;
