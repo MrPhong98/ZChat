@@ -812,9 +812,10 @@
         if (!sidebarWrap) return;
         sidebarWrap.classList.remove("-translate-x-full");
         if (sidebarScrim) sidebarScrim.classList.add("hidden");
-        // Trên mobile, quay lại danh sách chat thì hiện lại bottom nav
+        // Trên mobile, quay lại danh sách chat thì hiện lại bottom nav + trả lại khoảng chừa cho nó
         if (isMobileView() && bottomNav) {
             bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
         }
     }
     function closeSidebar() {
@@ -822,8 +823,9 @@
         if (!sidebarWrap) return;
         if (isMobileView()) {
             sidebarWrap.classList.add("-translate-x-full");
-            // Ẩn bottom nav khi đang mở 1 chat trên mobile
+            // Ẩn bottom nav khi đang mở 1 chat trên mobile, đồng thời bỏ khoảng chừa pb-[60px] để không còn khe hở
             if (bottomNav) bottomNav.classList.add("hidden");
+            if (appShell) appShell.classList.remove("pb-[60px]");
         } else {
             sidebarWrap.classList.remove("-translate-x-full");
         }
@@ -838,8 +840,13 @@
         if (!bottomNav) return;
         if (!isMobileView()) {
             bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
         } else if (state.activeChatId && sidebarWrap && sidebarWrap.classList.contains("-translate-x-full")) {
             bottomNav.classList.add("hidden");
+            if (appShell) appShell.classList.remove("pb-[60px]");
+        } else {
+            bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
         }
     });
 
