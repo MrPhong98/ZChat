@@ -88,9 +88,21 @@
                         <div class="mb-3 flex gap-1 rounded-pill p-1" style="background-color: var(--elevated2);">
                             <button type="button" data-avatar-tab="color" class="avatar-tab flex-1 rounded-pill py-1.5 text-xs font-semibold transition-colors">Color</button>
                             <button type="button" data-avatar-tab="emoji" class="avatar-tab flex-1 rounded-pill py-1.5 text-xs font-semibold transition-colors">Emoji</button>
+                            <button type="button" data-avatar-tab="photo" class="avatar-tab flex-1 rounded-pill py-1.5 text-xs font-semibold transition-colors">Photo</button>
                         </div>
                         <div id="colorSwatches" class="grid grid-cols-6 gap-2"></div>
                         <div id="emojiSwatches" class="hidden grid grid-cols-6 gap-1"></div>
+                        <div id="photoPanel" class="hidden flex-col items-center gap-3 py-2">
+                            <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" />
+                            <button type="button" id="uploadPhotoBtn"
+                                    class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-colors"
+                                    style="background-color: var(--elevated2); color: var(--ink);">
+                                <i data-lucide="upload" class="w-4 h-4"></i>
+                                <span id="uploadPhotoBtnLabel">Upload photo</span>
+                            </button>
+                            <p id="photoUploadError" class="hidden text-center text-xs" style="color: var(--dnd);"></p>
+                            <p class="text-center text-[11px]" style="color: var(--faint);">PNG, JPG, WEBP or GIF · Max 5MB</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -165,6 +177,8 @@
     </div>
     <span id="toastMsg" class="text-xs font-semibold">Profile updated successfully!</span>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js"></script>
 <script src="js/profile.js"></script>
 </body>
 </html>
