@@ -103,7 +103,7 @@
             editMsg: "Chỉnh sửa",
             deleteMsg: "Xóa",
             editModalTitle: "Chỉnh sửa tin nhắn",
-            saveBtn: "Save",
+            saveBtn: "Lưu",
             confirmDelete: "Bạn có chắc chắn muốn xóa tin nhắn này?",
             editedTag: "(đã chỉnh sửa)",
             confirmDeleteTitle: "Xóa tin nhắn",
@@ -135,7 +135,6 @@
             optionOff: "关闭",
             option10s: "10秒",
             option1m: "1分钟",
-            option10m: "1分钟",
             option10m: "10分钟",
             option24h: "24小时",
             screenshotBlocked: "此对话禁止截屏",
@@ -218,6 +217,211 @@
         }
     };
 
+    /* ============ DOM ELEMENTS ============ */
+    const onboarding = document.getElementById("onboarding");
+    const onboardingForm = document.getElementById("onboardingForm");
+    const usernameInput = document.getElementById("usernameInput");
+    const usernameError = document.getElementById("usernameError");
+    const loginForm = document.getElementById("loginForm");
+    const loginUsernameInput = document.getElementById("loginUsernameInput");
+    const loginRecoveryInput = document.getElementById("loginRecoveryInput");
+    const loginError = document.getElementById("loginError");
+    const switchToLoginBtn = document.getElementById("switchToLoginBtn");
+    const switchToRegisterBtn = document.getElementById("switchToRegisterBtn");
+    const toggleRecoveryVisibility = document.getElementById("toggleRecoveryVisibility");
+    const recoveryModal = document.getElementById("recoveryModal");
+    const recoveryPasswordDisplay = document.getElementById("recoveryPasswordDisplay");
+    const copyRecoveryBtn = document.getElementById("copyRecoveryBtn");
+    const recoveryContinueBtn = document.getElementById("recoveryContinueBtn");
+
+    const appShell = document.getElementById("appShell");
+    const profileAvatar = document.getElementById("profileAvatar");
+
+    const sidebarWrap = document.getElementById("sidebarWrap");
+    const sidebarScrim = document.getElementById("sidebarScrim");
+    const closeSidebarBtn = document.getElementById("closeSidebarBtn");
+    const openSidebarBtn = document.getElementById("openSidebarBtn");
+    const bottomNav = document.getElementById("bottomNav");
+
+    const searchInput = document.getElementById("searchInput");
+    const chatList = document.getElementById("chatList");
+    const chatListEmpty = document.getElementById("chatListEmpty");
+
+    const emptyState = document.getElementById("emptyState");
+    const activeChatEl = document.getElementById("activeChat");
+    const newChatEmptyBtn = document.getElementById("newChatEmptyBtn");
+    const newChatIconBtn = document.getElementById("newChatIconBtn");
+
+    const newChatModal = document.getElementById("newChatModal");
+    const newChatForm = document.getElementById("newChatForm");
+    const newChatNameInput = document.getElementById("newChatNameInput");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const cancelModalBtn = document.getElementById("cancelModalBtn");
+
+    const confirmModal = document.getElementById("confirmModal");
+    const confirmModalTitle = document.getElementById("confirmModalTitle");
+    const confirmModalDesc = document.getElementById("confirmModalDesc");
+    const cancelConfirmBtn = document.getElementById("cancelConfirmBtn");
+    const okConfirmBtn = document.getElementById("okConfirmBtn");
+
+    const chatHeaderAvatar = document.getElementById("chatHeaderAvatar");
+    const chatHeaderName = document.getElementById("chatHeaderName");
+    const chatHeaderStatus = document.getElementById("chatHeaderStatus");
+
+    const messageFeed = document.getElementById("messageFeed");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const sendIcon = document.getElementById("sendIcon");
+    const editBar = document.getElementById("editBar");
+    const editBarPreview = document.getElementById("editBarPreview");
+    const cancelEditBtn = document.getElementById("cancelEditBtn");
+    const attachBtn = document.getElementById("attachBtn");
+    const fileInput = document.getElementById("fileInput");
+    const emojiBtn = document.getElementById("emojiBtn");
+    const emojiPopover = document.getElementById("emojiPopover");
+
+    const infoDrawer = document.getElementById("infoDrawer");
+    const openInfoBtn = document.getElementById("openInfoBtn");
+    const closeInfoBtn = document.getElementById("closeInfoBtn");
+    const blockScreenshotsToggle = document.getElementById("blockScreenshotsToggle");
+
+    const disappearingMenuBtn = document.getElementById("disappearingMenuBtn");
+    const disappearingMenuPopup = document.getElementById("disappearingMenuPopup");
+    const disappearingChevron = document.getElementById("disappearingChevron");
+    const currentDisappearingLabel = document.getElementById("currentDisappearingLabel");
+    const disappearingActiveIcon = document.getElementById("disappearingActiveIcon");
+    const disappearingOptions = document.querySelectorAll(".disappearing-option");
+
+    /* ============ STATE ============ */
+    let currentUsername = localStorage.getItem("zchat_username") || "";
+    let editingMsgId = null;
+    let toastTimer = null;
+
+    const state = {
+        chats: [],
+        activeChatId: null,
+        searchQuery: "",
+    };
+
+    const EMOJIS = ["😀", "😂", "😍", "👍", "🙏", "🎉", "🔥", "❤️", "😢", "😮", "👏", "🙌"];
+    const AVATAR_COLORS = ["#4F46E5", "#0284C7", "#16A34A", "#D97706", "#DC2626", "#9333EA", "#2563EB", "#0D9488"];
+
+    /* ============ UTILITY FUNCTIONS ============ */
+    function icons() {
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function uid(prefix) {
+        return prefix + "_" + Math.random().toString(36).slice(2, 10);
+    }
+
+    function makeUuid() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        });
+    }
+
+    function initials(name) {
+        return (name || "")
+            .split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((n) => n[0].toUpperCase())
+            .join("");
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function colorFor(seed) {
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+        return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+    }
+
+    function formatTimeShort(ts) {
+        const d = new Date(ts);
+        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+
+    function formatListTimestamp(ts) {
+        const now = Date.now();
+        const diffMin = (now - ts) / 60000;
+        const diffHr = diffMin / 60;
+        const diffDay = diffHr / 24;
+        const d = new Date(ts);
+        if (diffMin < 1) return "now";
+        if (diffHr < 1) return Math.floor(diffMin) + "m";
+        if (diffDay < 1) return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        if (diffDay < 7) return d.toLocaleDateString([], { weekday: "short" });
+        return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+
+    function formatLastSeen(ts) {
+        if (!ts) return "offline";
+        const diffHr = (Date.now() - ts) / 3600000;
+        if (diffHr < 1) return "last seen just now";
+        if (diffHr < 24) return "last seen " + Math.floor(diffHr) + "h ago";
+        return "last seen " + new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+
+    function isSameDay(a, b) {
+        const da = new Date(a), db = new Date(b);
+        return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+    }
+
+    function dayLabel(ts) {
+        const today = Date.now();
+        const yesterday = today - 86400000;
+        if (isSameDay(ts, today)) return "Today";
+        if (isSameDay(ts, yesterday)) return "Yesterday";
+        return new Date(ts).toLocaleDateString([], { month: "long", day: "numeric" });
+    }
+
+    function isMobileView() {
+        return window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+    }
+
+    function customConfirm(title, message) {
+        return new Promise((resolve) => {
+            if (!confirmModal) {
+                resolve(true);
+                return;
+            }
+            if (confirmModalTitle) confirmModalTitle.textContent = title;
+            if (confirmModalDesc) confirmModalDesc.textContent = message;
+
+            confirmModal.classList.remove("hidden");
+            icons();
+
+            const handleOk = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            const cleanup = () => {
+                confirmModal.classList.add("hidden");
+                if (okConfirmBtn) okConfirmBtn.removeEventListener("click", handleOk);
+                if (cancelConfirmBtn) cancelConfirmBtn.removeEventListener("click", handleCancel);
+            };
+
+            if (okConfirmBtn) okConfirmBtn.addEventListener("click", handleOk);
+            if (cancelConfirmBtn) cancelConfirmBtn.addEventListener("click", handleCancel);
+        });
+    }
+
+    /* ============ I18N & THEME ============ */
     function applyLanguage() {
         const lang = localStorage.getItem("zchat_lang") || "en";
         const dict = i18n[lang] || i18n.en;
@@ -305,6 +509,7 @@
                 labelEl.textContent = optionLabels[val];
             }
         });
+
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (chat) {
             updateDisappearingUI(chat.disappearingTime || "off");
@@ -317,72 +522,34 @@
         }
     });
 
-    function uid(prefix) {
-        return prefix + "_" + Math.random().toString(36).slice(2, 10);
+    function syncProfileData() {
+        const savedTheme = localStorage.getItem("zchat_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", savedTheme);
+
+        const avatarType = localStorage.getItem("zchat_avatar_type") || "initials";
+        const avatarColor = localStorage.getItem("zchat_avatar_color") || colorFor(currentUsername);
+        const avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || "😀";
+        const avatarUrl = localStorage.getItem("zchat_avatar_url") || "";
+
+        const profileAvatarMobile = document.getElementById("profileAvatarMobile");
+        const targets = [profileAvatar, profileAvatarMobile].filter(Boolean);
+
+        targets.forEach((el) => {
+            if (avatarType === "photo" && avatarUrl) {
+                el.style.backgroundColor = "var(--elevated2)";
+                el.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="h-full w-full rounded-full object-cover" />`;
+            } else if (avatarType === "emoji") {
+                el.style.backgroundColor = "var(--elevated2)";
+                el.textContent = avatarEmoji;
+            } else {
+                el.style.backgroundColor = avatarColor;
+                el.style.color = "var(--avatar-text)";
+                el.textContent = initials(currentUsername);
+            }
+        });
     }
 
-    function initials(name) {
-        return (name || "")
-            .split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((n) => n[0].toUpperCase())
-            .join("");
-    }
-
-    function escapeHtml(str) {
-        const div = document.createElement("div");
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function formatTimeShort(ts) {
-        const d = new Date(ts);
-        return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-
-    function formatListTimestamp(ts) {
-        const now = Date.now();
-        const diffMin = (now - ts) / 60000;
-        const diffHr = diffMin / 60;
-        const diffDay = diffHr / 24;
-        const d = new Date(ts);
-        if (diffMin < 1) return "now";
-        if (diffHr < 1) return Math.floor(diffMin) + "m";
-        if (diffDay < 1) return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-        if (diffDay < 7) return d.toLocaleDateString([], { weekday: "short" });
-        return d.toLocaleDateString([], { month: "short", day: "numeric" });
-    }
-
-    function formatLastSeen(ts) {
-        if (!ts) return "offline";
-        const diffHr = (Date.now() - ts) / 3600000;
-        if (diffHr < 1) return "last seen just now";
-        if (diffHr < 24) return "last seen " + Math.floor(diffHr) + "h ago";
-        return "last seen " + new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
-    }
-
-    function isSameDay(a, b) {
-        const da = new Date(a), db = new Date(b);
-        return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
-    }
-
-    function dayLabel(ts) {
-        const today = Date.now();
-        const yesterday = today - 86400000;
-        if (isSameDay(ts, today)) return "Today";
-        if (isSameDay(ts, yesterday)) return "Yesterday";
-        return new Date(ts).toLocaleDateString([], { month: "long", day: "numeric" });
-    }
-
-    const AVATAR_COLORS = ["#4F46E5", "#0284C7", "#16A34A", "#D97706", "#DC2626", "#9333EA", "#2563EB", "#0D9488"];
-    function colorFor(seed) {
-        let hash = 0;
-        for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-        return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-    }
-
-    /* ============ ĐỒNG BỘ AVATAR NGƯỜI CHAT CÙNG (Supabase "users") ============ */
+    /* ============ AVATARS & PARTICIPANTS ============ */
     function applyAvatarFields(participant, row) {
         if (!participant || !row) return;
         participant.avatarType = row.avatar_type || "initials";
@@ -410,9 +577,6 @@
         }
     }
 
-    /* Lấy avatar cho tất cả participant hiện có trong state.chats.
-       Dùng ilike (không phân biệt hoa/thường) từng tên một để tránh lệch case
-       giữa tên hiển thị trong chat và username thật lưu trong bảng users. */
     async function refreshAllParticipantAvatars() {
         if (!window.supabaseClient) return;
         const names = [...new Set(
@@ -446,7 +610,6 @@
         }
     }
 
-    /* Nghe realtime khi user khác đổi avatar -> cập nhật ngay không cần reload */
     function subscribeToUserAvatarChanges() {
         if (!window.supabaseClient) return;
 
@@ -476,15 +639,41 @@
             .subscribe();
     }
 
-    let currentUsername = localStorage.getItem("zchat_username") || "";
+    function avatarHtml(participant, size = 44) {
+        const isSaved = participant && (participant.id.startsWith("u_") && participant.name === "Saved Messages");
 
-    const state = {
-        chats: [],
-        activeChatId: null,
-        searchQuery: "",
-    };
+        if (isSaved) {
+            const iconSize = Math.round(size * 0.48);
+            return `
+      <div class="relative shrink-0" style="width:${size}px;height:${size}px">
+        <div class="flex h-full w-full items-center justify-center rounded-full select-none" style="background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); color: #fff;">
+          <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v15.2a.8.8 0 0 1-1.28.64L12 16.3l-4.72 4.04A.8.8 0 0 1 6 19.7V4.5Z" fill="currentColor"/>
+          </svg>
+        </div>
+      </div>`;
+        }
 
-    // Hàm tạo hoặc đồng bộ Saved Messages theo user hiện tại
+        const dotSize = Math.round(size * 0.28);
+        const statusDot = participant.online
+            ? `<span class="absolute bottom-0 right-0 rounded-full border-2 bg-online" style="border-color: var(--surface); width:${dotSize}px;height:${dotSize}px"></span>`
+            : "";
+
+        const innerAvatar = (participant.avatarType === "photo" && participant.avatarUrl)
+            ? `<img src="${participant.avatarUrl}" alt="${initials(participant.name)}" class="h-full w-full rounded-full object-cover select-none" />`
+            : (participant.avatarType === "emoji" && participant.avatarEmoji)
+                ? `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color: var(--elevated2);">${participant.avatarEmoji}</div>`
+                : `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color:${participant.avatarColor || colorFor(participant.name)}; color: var(--avatar-text);">${initials(participant.name)}</div>`;
+
+        return `
+      <div class="relative shrink-0" style="width:${size}px;height:${size}px">
+        ${innerAvatar}
+        ${statusDot}
+      </div>
+    `;
+    }
+
+    /* ============ CHAT DATA MANAGEMENT ============ */
     function ensureSavedMessagesChat() {
         const user = (currentUsername || localStorage.getItem("zchat_username") || "guest").toLowerCase();
         const savedChatId = `saved_${user}`;
@@ -507,149 +696,34 @@
         return savedChatId;
     }
 
-    const EMOJIS = ["😀", "😂", "😍", "👍", "🙏", "🎉", "🔥", "❤️", "😢", "😮", "👏", "🙌"];
-
-    const onboarding = document.getElementById("onboarding");
-    const onboardingForm = document.getElementById("onboardingForm");
-    const usernameInput = document.getElementById("usernameInput");
-    const usernameError = document.getElementById("usernameError");
-    const loginForm = document.getElementById("loginForm");
-    const loginUsernameInput = document.getElementById("loginUsernameInput");
-    const loginRecoveryInput = document.getElementById("loginRecoveryInput");
-    const loginError = document.getElementById("loginError");
-    const switchToLoginBtn = document.getElementById("switchToLoginBtn");
-    const switchToRegisterBtn = document.getElementById("switchToRegisterBtn");
-    const toggleRecoveryVisibility = document.getElementById("toggleRecoveryVisibility");
-    const recoveryModal = document.getElementById("recoveryModal");
-    const recoveryPasswordDisplay = document.getElementById("recoveryPasswordDisplay");
-    const copyRecoveryBtn = document.getElementById("copyRecoveryBtn");
-    const recoveryContinueBtn = document.getElementById("recoveryContinueBtn");
-
-    const appShell = document.getElementById("appShell");
-    const profileAvatar = document.getElementById("profileAvatar");
-
-    const sidebarWrap = document.getElementById("sidebarWrap");
-    const sidebarScrim = document.getElementById("sidebarScrim");
-    const closeSidebarBtn = document.getElementById("closeSidebarBtn");
-    const openSidebarBtn = document.getElementById("openSidebarBtn");
-    const bottomNav = document.getElementById("bottomNav");
-
-    const searchInput = document.getElementById("searchInput");
-    const chatList = document.getElementById("chatList");
-    const chatListEmpty = document.getElementById("chatListEmpty");
-
-    const emptyState = document.getElementById("emptyState");
-    const activeChatEl = document.getElementById("activeChat");
-    const newChatEmptyBtn = document.getElementById("newChatEmptyBtn");
-    const newChatIconBtn = document.getElementById("newChatIconBtn");
-
-    const newChatModal = document.getElementById("newChatModal");
-    const newChatForm = document.getElementById("newChatForm");
-    const newChatNameInput = document.getElementById("newChatNameInput");
-    const closeModalBtn = document.getElementById("closeModalBtn");
-    const cancelModalBtn = document.getElementById("cancelModalBtn");
-
-    const confirmModal = document.getElementById("confirmModal");
-    const confirmModalTitle = document.getElementById("confirmModalTitle");
-    const confirmModalDesc = document.getElementById("confirmModalDesc");
-    const cancelConfirmBtn = document.getElementById("cancelConfirmBtn");
-    const okConfirmBtn = document.getElementById("okConfirmBtn");
-
-    const chatHeaderAvatar = document.getElementById("chatHeaderAvatar");
-    const chatHeaderName = document.getElementById("chatHeaderName");
-    const chatHeaderStatus = document.getElementById("chatHeaderStatus");
-
-    const messageFeed = document.getElementById("messageFeed");
-    const messageInput = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-    const sendIcon = document.getElementById("sendIcon");
-    const editBar = document.getElementById("editBar");
-    const editBarPreview = document.getElementById("editBarPreview");
-    const cancelEditBtn = document.getElementById("cancelEditBtn");
-    const attachBtn = document.getElementById("attachBtn");
-    const fileInput = document.getElementById("fileInput");
-    const emojiBtn = document.getElementById("emojiBtn");
-    const emojiPopover = document.getElementById("emojiPopover");
-
-    const infoDrawer = document.getElementById("infoDrawer");
-    const openInfoBtn = document.getElementById("openInfoBtn");
-    const closeInfoBtn = document.getElementById("closeInfoBtn");
-    const blockScreenshotsToggle = document.getElementById("blockScreenshotsToggle");
-
-    const disappearingMenuBtn = document.getElementById("disappearingMenuBtn");
-    const disappearingMenuPopup = document.getElementById("disappearingMenuPopup");
-    const disappearingChevron = document.getElementById("disappearingChevron");
-    const currentDisappearingLabel = document.getElementById("currentDisappearingLabel");
-    const disappearingActiveIcon = document.getElementById("disappearingActiveIcon");
-    const disappearingOptions = document.querySelectorAll(".disappearing-option");
-
-    // Biến toàn cục theo dõi tin nhắn đang chỉnh sửa
-    let editingMsgId = null;
-
-    function customConfirm(title, message) {
-        return new Promise((resolve) => {
-            if (!confirmModal) {
-                resolve(true);
-                return;
-            }
-            if (confirmModalTitle) confirmModalTitle.textContent = title;
-            if (confirmModalDesc) confirmModalDesc.textContent = message;
-
-            confirmModal.classList.remove("hidden");
-            icons();
-
-            const handleOk = () => {
-                cleanup();
-                resolve(true);
-            };
-
-            const handleCancel = () => {
-                cleanup();
-                resolve(false);
-            };
-
-            const cleanup = () => {
-                confirmModal.classList.add("hidden");
-                okConfirmBtn.removeEventListener("click", handleOk);
-                cancelConfirmBtn.removeEventListener("click", handleCancel);
-            };
-
-            okConfirmBtn.addEventListener("click", handleOk);
-            cancelConfirmBtn.addEventListener("click", handleCancel);
-        });
+    function resolveOtherNameFromChatId(chatId, me, senderUsername) {
+        const meL = (me || "").toLowerCase();
+        if (!chatId) return senderUsername && senderUsername.toLowerCase() !== meL ? senderUsername : "Chat User";
+        if (chatId.startsWith("saved_")) return "Saved Messages";
+        if (chatId.startsWith("chat_")) {
+            const rest = chatId.slice(5);
+            if (meL && rest.startsWith(meL + "_")) return rest.slice(meL.length + 1);
+            if (meL && rest.endsWith("_" + meL)) return rest.slice(0, -(meL.length + 1));
+            const other = rest.split("_").find((p) => p && p !== meL);
+            if (other) return other;
+        }
+        if (senderUsername && senderUsername.toLowerCase() !== meL) return senderUsername;
+        return "Chat User";
     }
 
-    function icons() {
-        if (window.lucide) window.lucide.createIcons();
+    function getFilteredSortedChats() {
+        const q = state.searchQuery.trim().toLowerCase();
+        return state.chats
+            .filter((c) => c.participant.name.toLowerCase().includes(q))
+            .slice()
+            .sort((a, b) => {
+                const at = a.messages.length ? a.messages[a.messages.length - 1].createdAt : 0;
+                const bt = b.messages.length ? b.messages[b.messages.length - 1].createdAt : 0;
+                return bt - at;
+            });
     }
 
-    function syncProfileData() {
-        const savedTheme = localStorage.getItem("zchat_theme") || "dark";
-        document.documentElement.setAttribute("data-theme", savedTheme);
-
-        const avatarType = localStorage.getItem("zchat_avatar_type") || "initials";
-        const avatarColor = localStorage.getItem("zchat_avatar_color") || colorFor(currentUsername);
-        const avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || "😀";
-        const avatarUrl = localStorage.getItem("zchat_avatar_url") || "";
-
-        const profileAvatarMobile = document.getElementById("profileAvatarMobile");
-        const targets = [profileAvatar, profileAvatarMobile].filter(Boolean);
-
-        targets.forEach((el) => {
-            if (avatarType === "photo" && avatarUrl) {
-                el.style.backgroundColor = "var(--elevated2)";
-                el.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="h-full w-full rounded-full object-cover" />`;
-            } else if (avatarType === "emoji") {
-                el.style.backgroundColor = "var(--elevated2)";
-                el.textContent = avatarEmoji;
-            } else {
-                el.style.backgroundColor = avatarColor;
-                el.style.color = "var(--avatar-text)";
-                el.textContent = initials(currentUsername);
-            }
-        });
-    }
-
+    /* ============ AUTH & ONBOARDING ============ */
     function generateRecoveryPassword() {
         const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
         const part = (len) => {
@@ -690,9 +764,7 @@
         ensureSavedMessagesChat();
 
         state.searchQuery = "";
-        if (searchInput) {
-            searchInput.value = "";
-        }
+        if (searchInput) searchInput.value = "";
 
         syncProfileData();
         applyLanguage();
@@ -806,53 +878,60 @@
         });
     }
 
-    function avatarHtml(participant, size) {
-        size = size || 44;
-        const isSaved = participant && (participant.id.startsWith("u_") && participant.name === "Saved Messages");
-
-        if (isSaved) {
-            const iconSize = Math.round(size * 0.48);
-            return `
-      <div class="relative shrink-0" style="width:${size}px;height:${size}px">
-        <div class="flex h-full w-full items-center justify-center rounded-full select-none" style="background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); color: #fff;">
-          <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v15.2a.8.8 0 0 1-1.28.64L12 16.3l-4.72 4.04A.8.8 0 0 1 6 19.7V4.5Z" fill="currentColor"/>
-          </svg>
-        </div>
-      </div>`;
+    /* ============ UI NAVIGATION & LAYOUT ============ */
+    function openSidebar() {
+        if (!sidebarWrap) return;
+        sidebarWrap.classList.remove("-translate-x-full");
+        if (sidebarScrim) sidebarScrim.classList.add("hidden");
+        if (isMobileView() && bottomNav) {
+            bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
         }
-
-        const dotSize = Math.round(size * 0.28);
-        const statusDot = participant.online
-            ? `<span class="absolute bottom-0 right-0 rounded-full border-2 bg-online" style="border-color: var(--surface); width:${dotSize}px;height:${dotSize}px"></span>`
-            : "";
-
-        const innerAvatar = (participant.avatarType === "photo" && participant.avatarUrl)
-            ? `<img src="${participant.avatarUrl}" alt="${initials(participant.name)}" class="h-full w-full rounded-full object-cover select-none" />`
-            : (participant.avatarType === "emoji" && participant.avatarEmoji)
-                ? `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color: var(--elevated2);">${participant.avatarEmoji}</div>`
-                : `<div class="flex h-full w-full items-center justify-center rounded-full text-sm font-semibold select-none" style="background-color:${participant.avatarColor || colorFor(participant.name)}; color: var(--avatar-text);">${initials(participant.name)}</div>`;
-
-        return `
-      <div class="relative shrink-0" style="width:${size}px;height:${size}px">
-        ${innerAvatar}
-        ${statusDot}
-      </div>
-    `;
     }
 
-    function getFilteredSortedChats() {
-        const q = state.searchQuery.trim().toLowerCase();
-        return state.chats
-            .filter((c) => c.participant.name.toLowerCase().includes(q))
-            .slice()
-            .sort((a, b) => {
-                const at = a.messages.length ? a.messages[a.messages.length - 1].createdAt : 0;
-                const bt = b.messages.length ? b.messages[b.messages.length - 1].createdAt : 0;
-                return bt - at;
-            });
+    function closeSidebar() {
+        if (!sidebarWrap) return;
+        if (isMobileView()) {
+            sidebarWrap.classList.add("-translate-x-full");
+            if (bottomNav) bottomNav.classList.add("hidden");
+            if (appShell) appShell.classList.remove("pb-[60px]");
+        } else {
+            sidebarWrap.classList.remove("-translate-x-full");
+        }
+        if (sidebarScrim) sidebarScrim.classList.add("hidden");
     }
 
+    if (openSidebarBtn) openSidebarBtn.addEventListener("click", openSidebar);
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener("click", closeSidebar);
+    if (sidebarScrim) sidebarScrim.addEventListener("click", closeSidebar);
+
+    window.addEventListener("resize", () => {
+        if (!bottomNav) return;
+        if (!isMobileView()) {
+            bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
+        } else if (state.activeChatId && sidebarWrap && sidebarWrap.classList.contains("-translate-x-full")) {
+            bottomNav.classList.add("hidden");
+            if (appShell) appShell.classList.remove("pb-[60px]");
+        } else {
+            bottomNav.classList.remove("hidden");
+            if (appShell) appShell.classList.add("pb-[60px]");
+        }
+    });
+
+    function selectChat(chatId) {
+        state.activeChatId = chatId;
+        const chat = state.chats.find((c) => c.id === chatId);
+        if (chat) chat.unread = 0;
+        cancelEditMode();
+        closeInfoDrawer();
+        closeSidebar();
+        renderChatList();
+        renderActiveChat();
+        loadMessagesForChat(chatId);
+    }
+
+    /* ============ RENDER UI FUNCTIONS ============ */
     function renderChatList() {
         const list = getFilteredSortedChats();
         chatList.innerHTML = "";
@@ -912,65 +991,6 @@
         renderChatList();
     });
 
-    function isMobileView() {
-        return window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
-    }
-
-    function openSidebar() {
-        if (!sidebarWrap) return;
-        sidebarWrap.classList.remove("-translate-x-full");
-        if (sidebarScrim) sidebarScrim.classList.add("hidden");
-        // Trên mobile, quay lại danh sách chat thì hiện lại bottom nav + trả lại khoảng chừa cho nó
-        if (isMobileView() && bottomNav) {
-            bottomNav.classList.remove("hidden");
-            if (appShell) appShell.classList.add("pb-[60px]");
-        }
-    }
-    function closeSidebar() {
-        // Chỉ ẩn list trên mobile khi vào chat; desktop luôn hiện list
-        if (!sidebarWrap) return;
-        if (isMobileView()) {
-            sidebarWrap.classList.add("-translate-x-full");
-            // Ẩn bottom nav khi đang mở 1 chat trên mobile, đồng thời bỏ khoảng chừa pb-[60px] để không còn khe hở
-            if (bottomNav) bottomNav.classList.add("hidden");
-            if (appShell) appShell.classList.remove("pb-[60px]");
-        } else {
-            sidebarWrap.classList.remove("-translate-x-full");
-        }
-        if (sidebarScrim) sidebarScrim.classList.add("hidden");
-    }
-    if (openSidebarBtn) openSidebarBtn.addEventListener("click", openSidebar);
-    if (closeSidebarBtn) closeSidebarBtn.addEventListener("click", closeSidebar);
-    if (sidebarScrim) sidebarScrim.addEventListener("click", closeSidebar);
-
-    // Đồng bộ lại trạng thái bottom nav khi resize qua lại giữa mobile/desktop
-    window.addEventListener("resize", () => {
-        if (!bottomNav) return;
-        if (!isMobileView()) {
-            bottomNav.classList.remove("hidden");
-            if (appShell) appShell.classList.add("pb-[60px]");
-        } else if (state.activeChatId && sidebarWrap && sidebarWrap.classList.contains("-translate-x-full")) {
-            bottomNav.classList.add("hidden");
-            if (appShell) appShell.classList.remove("pb-[60px]");
-        } else {
-            bottomNav.classList.remove("hidden");
-            if (appShell) appShell.classList.add("pb-[60px]");
-        }
-    });
-
-    function selectChat(chatId) {
-        state.activeChatId = chatId;
-        const chat = state.chats.find((c) => c.id === chatId);
-        if (chat) chat.unread = 0;
-        cancelEditMode();
-        closeInfoDrawer();
-        closeSidebar();
-        renderChatList();
-        renderActiveChat();
-
-        loadMessagesForChat(chatId);
-    }
-
     function statusIconMarkup(status) {
         if (status === "sending") return `<i data-lucide="clock-3" class="w-[12px] h-[12px]" style="color: var(--faint);"></i>`;
         if (status === "sent") return `<i data-lucide="check" class="w-[13px] h-[13px]" style="color: var(--faint);"></i>`;
@@ -1011,90 +1031,6 @@
 
         renderMessages(chat);
         icons();
-    }
-
-    /* ============ ĐIỀU KHIỂN EDIT MODE BẰNG EDIT BAR ============ */
-    function startEditMessage(msgId, currentText) {
-        editingMsgId = msgId;
-
-        messageInput.value = currentText;
-        messageInput.focus();
-        messageInput.style.height = "auto";
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
-
-        if (editBar) {
-            editBarPreview.textContent = currentText;
-            editBar.classList.remove("hidden");
-        }
-
-        if (sendIcon) {
-            sendIcon.setAttribute("data-lucide", "check");
-            icons();
-        }
-
-        updateSendBtnState();
-    }
-
-    function cancelEditMode() {
-        editingMsgId = null;
-        messageInput.value = "";
-        messageInput.style.height = "auto";
-
-        if (editBar) {
-            editBar.classList.add("hidden");
-        }
-
-        if (sendIcon) {
-            sendIcon.setAttribute("data-lucide", "send-horizontal");
-            icons();
-        }
-
-        updateSendBtnState();
-    }
-
-    if (cancelEditBtn) {
-        cancelEditBtn.addEventListener("click", cancelEditMode);
-    }
-
-    /* ============ CHỈNH SỬA & XÓA TIN NHẮN (EDIT & DELETE) ============ */
-    async function deleteMessage(msgId) {
-        const lang = localStorage.getItem("zchat_lang") || "en";
-        const dict = i18n[lang] || i18n.en;
-
-        const confirmed = await customConfirm(
-            dict.confirmDeleteTitle || "Delete Message",
-            dict.confirmDelete || "Are you sure you want to delete this message?"
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        if (editingMsgId === msgId) {
-            cancelEditMode();
-        }
-
-        const chat = state.chats.find((c) => c.id === state.activeChatId);
-        if (chat) {
-            chat.messages = chat.messages.filter((m) => m.id !== msgId);
-            renderMessages(chat);
-            renderChatList();
-        }
-
-        if (window.supabaseClient) {
-            try {
-                const { error } = await window.supabaseClient
-                    .from("messages")
-                    .delete()
-                    .eq("id", msgId);
-
-                if (error) {
-                    console.error("[ZChat] Delete message error:", error);
-                }
-            } catch (err) {
-                console.error("[ZChat] Delete exception:", err);
-            }
-        }
     }
 
     function renderMessages(chat) {
@@ -1217,21 +1153,88 @@
         icons();
     }
 
-    function renderTypingIndicator(chat) {
-        const wrap = document.createElement("div");
-        wrap.id = "typingIndicator";
-        wrap.className = "flex w-full justify-start fade-in mb-3";
-        wrap.innerHTML = `
-      <div class="rounded-bubble rounded-bl-md px-4 py-3 flex items-center gap-1" style="background-color: var(--elevated);">
-        <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
-        <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
-        <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
-      </div>`;
-        messageFeed.appendChild(wrap);
-        messageFeed.scrollTop = messageFeed.scrollHeight;
+    /* ============ EDIT & DELETE MESSAGE ============ */
+    function startEditMessage(msgId, currentText) {
+        editingMsgId = msgId;
+
+        messageInput.value = currentText;
+        messageInput.focus();
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
+
+        if (editBar) {
+            editBarPreview.textContent = currentText;
+            editBar.classList.remove("hidden");
+        }
+
+        if (sendIcon) {
+            sendIcon.setAttribute("data-lucide", "check");
+            icons();
+        }
+
+        updateSendBtnState();
     }
 
-    /* ============ XỬ LÝ TIN NHẮN TỰ XÓA chuẩn UI + DB ============ */
+    function cancelEditMode() {
+        editingMsgId = null;
+        messageInput.value = "";
+        messageInput.style.height = "auto";
+
+        if (editBar) {
+            editBar.classList.add("hidden");
+        }
+
+        if (sendIcon) {
+            sendIcon.setAttribute("data-lucide", "send-horizontal");
+            icons();
+        }
+
+        updateSendBtnState();
+    }
+
+    if (cancelEditBtn) {
+        cancelEditBtn.addEventListener("click", cancelEditMode);
+    }
+
+    async function deleteMessage(msgId) {
+        const lang = localStorage.getItem("zchat_lang") || "en";
+        const dict = i18n[lang] || i18n.en;
+
+        const confirmed = await customConfirm(
+            dict.confirmDeleteTitle || "Delete Message",
+            dict.confirmDelete || "Are you sure you want to delete this message?"
+        );
+
+        if (!confirmed) return;
+
+        if (editingMsgId === msgId) {
+            cancelEditMode();
+        }
+
+        const chat = state.chats.find((c) => c.id === state.activeChatId);
+        if (chat) {
+            chat.messages = chat.messages.filter((m) => m.id !== msgId);
+            renderMessages(chat);
+            renderChatList();
+        }
+
+        if (window.supabaseClient) {
+            try {
+                const { error } = await window.supabaseClient
+                    .from("messages")
+                    .delete()
+                    .eq("id", msgId);
+
+                if (error) {
+                    console.error("[ZChat] Delete message error:", error);
+                }
+            } catch (err) {
+                console.error("[ZChat] Delete exception:", err);
+            }
+        }
+    }
+
+    /* ============ DISAPPEARING & SCREENSHOT PROTECTION ============ */
     function scheduleDisappearing(chat, msg) {
         if (!chat.disappearingTime || chat.disappearingTime === "off") return;
 
@@ -1274,7 +1277,6 @@
         }
     }
 
-    let toastTimer = null;
     function showScreenshotBlockedToast() {
         const toast = document.getElementById("zchatToast");
         if (!toast) return;
@@ -1296,10 +1298,12 @@
         }
     });
 
+    /* ============ INFO DRAWER & DISAPPEARING MENU ============ */
     function openInfoDrawer() {
         infoDrawer.classList.remove("hidden");
         icons();
     }
+
     function closeInfoDrawer() {
         infoDrawer.classList.add("hidden");
         closeDisappearingMenu();
@@ -1393,6 +1397,7 @@
         }
     });
 
+    /* ============ MESSAGE INPUT & SENDING ============ */
     function updateSendBtnState() {
         sendBtn.disabled = messageInput.value.trim().length === 0;
     }
@@ -1418,7 +1423,6 @@
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (!chat) return;
 
-        // Trường hợp đang chỉnh sửa tin nhắn cũ (Edit Mode)
         if (editingMsgId) {
             const msg = chat.messages.find((m) => m.id === editingMsgId);
             if (msg) {
@@ -1442,7 +1446,6 @@
             return;
         }
 
-        // Trường hợp gửi tin nhắn mới
         const msg = { id: uid("m"), senderId: "me", text: text, createdAt: Date.now(), status: "sending" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
@@ -1455,7 +1458,6 @@
         renderMessages(chat);
         renderChatList();
 
-        // Cập nhật trạng thái gửi thành công (dấu tick)
         setTimeout(() => {
             msg.status = "sent";
             if (state.activeChatId === chat.id) renderMessages(chat);
@@ -1469,6 +1471,66 @@
     }
 
     attachBtn.addEventListener("click", () => fileInput.click());
+
+    if (fileInput) {
+        fileInput.addEventListener("change", async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const chat = state.chats.find((c) => c.id === state.activeChatId);
+            if (!chat) return;
+
+            if (file.type.startsWith("image/")) {
+                if (typeof uploadChatImage === "function") {
+                    const imageUrl = await uploadChatImage(file);
+                    if (imageUrl) {
+                        const msg = {
+                            id: uid("m"),
+                            senderId: "me",
+                            text: `[IMAGE]:${imageUrl}`,
+                            createdAt: Date.now(),
+                            status: "sending"
+                        };
+                        chat.messages.push(msg);
+                        postMessageToSupabase(msg, chat.id);
+                        renderMessages(chat);
+                        renderChatList();
+                    }
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const msg = {
+                            id: uid("m"),
+                            senderId: "me",
+                            text: `[IMAGE]:${evt.target.result}`,
+                            createdAt: Date.now(),
+                            status: "sending"
+                        };
+                        chat.messages.push(msg);
+                        postMessageToSupabase(msg, chat.id);
+                        renderMessages(chat);
+                        renderChatList();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            } else {
+                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
+                chat.messages.push(msg);
+                postMessageToSupabase(msg, chat.id);
+                scheduleDisappearing(chat, msg);
+
+                renderMessages(chat);
+                renderChatList();
+
+                setTimeout(() => {
+                    msg.status = "delivered";
+                    if (state.activeChatId === chat.id) renderMessages(chat);
+                }, 900);
+            }
+
+            fileInput.value = "";
+        });
+    }
 
     function renderEmojiPopover() {
         emojiPopover.innerHTML = EMOJIS.map(
@@ -1489,12 +1551,14 @@
         e.stopPropagation();
         emojiPopover.classList.toggle("hidden");
     });
+
     document.addEventListener("click", (e) => {
         if (!emojiPopover.contains(e.target) && e.target !== emojiBtn) {
             emojiPopover.classList.add("hidden");
         }
     });
 
+    /* ============ NEW CHAT MODAL ============ */
     function openNewChatModal() {
         newChatModal.classList.remove("hidden");
         newChatNameInput.value = "";
@@ -1511,10 +1575,9 @@
 
     newChatEmptyBtn.addEventListener("click", openNewChatModal);
     newChatIconBtn.addEventListener("click", openNewChatModal);
-    closeModalBtn.addEventListener("click", closeModalBtn ? closeNewChatModal : () => {});
+    if (closeModalBtn) closeModalBtn.addEventListener("click", closeNewChatModal);
     cancelModalBtn.addEventListener("click", closeNewChatModal);
 
-    /* ============ XỬ LÝ SỰ KIỆN TẠO CHAT MỚI ============ */
     newChatForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const rawName = newChatNameInput ? newChatNameInput.value.trim() : "";
@@ -1566,17 +1629,16 @@
         if (!userFound) {
             let errEl = document.getElementById("newChatError");
             if (!errEl) {
-                // Nếu chưa có thẻ hiển thị lỗi thì tạo nhanh một thẻ nhỏ màu đỏ dưới ô input
                 errEl = document.createElement("p");
                 errEl.id = "newChatError";
                 errEl.className = "text-red-500 text-xs mt-1.5 font-medium";
                 newChatNameInput.parentNode.appendChild(errEl);
             }
-            errEl.textContent = "No User found!"; // Chuyển thành No User found cực kỳ chuyên nghiệp
+            errEl.textContent = "No User found!";
             newChatNameInput.focus();
             return;
         }
-        // Tạo Chat ID cố định ghép từ tên 2 người theo thứ tự bảng chữ cái (tránh bị dính c_saved hoặc id ngẫu nhiên)
+
         const sortedUsers = [currentUser.toLowerCase(), matchedName.toLowerCase()].sort();
         const targetChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
 
@@ -1596,7 +1658,7 @@
             if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
             state.chats.unshift(chat);
         } else {
-            chat.id = targetChatId; // Đồng bộ chuẩn ID
+            chat.id = targetChatId;
             if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
         }
 
@@ -1608,16 +1670,7 @@
         renderActiveChat();
     });
 
-    /* ============ SUPABASE MESSAGES ============ */
-    function makeUuid() {
-        if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-            const r = (Math.random() * 16) | 0;
-            const v = c === "x" ? r : (r & 0x3) | 0x8;
-            return v.toString(16);
-        });
-    }
-
+    /* ============ SUPABASE DATA INTEGRATION ============ */
     async function loadMessagesFromSupabase() {
         if (!window.supabaseClient) {
             console.warn("[ZChat] supabaseClient missing");
@@ -1641,7 +1694,6 @@
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
 
-                // Tránh load tin nhắn Saved Messages của người dùng khác
                 if (chatId.startsWith("saved_") && chatId !== mySavedChatId) {
                     return;
                 }
@@ -1708,11 +1760,9 @@
 
         let realChatId = chatId;
 
-        // Nếu là Saved Messages hoặc gửi cho chính mình
         if (!currentChat || currentChat.participant.name === "Saved Messages" || chatId.startsWith("saved_")) {
             realChatId = `saved_${me.toLowerCase()}`;
         } else {
-            // Nếu gửi cho người dùng khác, tự động tạo/chuẩn hóa ID dạng chat_userA_userB (sắp xếp A-Z)
             const otherUser = currentChat.participant.name.trim();
             const sortedUsers = [me.toLowerCase(), otherUser.toLowerCase()].sort();
             realChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
@@ -1743,82 +1793,6 @@
         }
     }
 
-    if (fileInput) {
-        fileInput.addEventListener("change", async (e) => {
-            const file = e.target.files && e.target.files[0];
-            if (!file) return;
-
-            const chat = state.chats.find((c) => c.id === state.activeChatId);
-            if (!chat) return;
-
-            if (file.type.startsWith("image/")) {
-                if (typeof uploadChatImage === "function") {
-                    const imageUrl = await uploadChatImage(file);
-                    if (imageUrl) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${imageUrl}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
-                    }
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = function(evt) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${evt.target.result}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
-                    };
-                    reader.readAsDataURL(file);
-                }
-            } else {
-                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
-                chat.messages.push(msg);
-                postMessageToSupabase(msg, chat.id);
-                scheduleDisappearing(chat, msg);
-
-                renderMessages(chat);
-                renderChatList();
-
-                setTimeout(() => {
-                    msg.status = "delivered";
-                    if (state.activeChatId === chat.id) renderMessages(chat);
-                }, 900);
-            }
-
-            fileInput.value = "";
-        });
-    }
-
-    /* ============ REALTIME (phải nằm trong IIFE để dùng được state) ============ */
-    function resolveOtherNameFromChatId(chatId, me, senderUsername) {
-        const meL = (me || "").toLowerCase();
-        if (!chatId) return senderUsername && senderUsername.toLowerCase() !== meL ? senderUsername : "Chat User";
-        if (chatId.startsWith("saved_")) return "Saved Messages";
-        if (chatId.startsWith("chat_")) {
-            const rest = chatId.slice(5);
-            if (meL && rest.startsWith(meL + "_")) return rest.slice(meL.length + 1);
-            if (meL && rest.endsWith("_" + meL)) return rest.slice(0, -(meL.length + 1));
-            const other = rest.split("_").find((p) => p && p !== meL);
-            if (other) return other;
-        }
-        if (senderUsername && senderUsername.toLowerCase() !== meL) return senderUsername;
-        return "Chat User";
-    }
-
     function subscribeToMessages() {
         if (!window.supabaseClient) {
             console.warn("[ZChat] Realtime: supabaseClient missing");
@@ -1839,12 +1813,10 @@
                         const mySavedChatId = `saved_${me.toLowerCase()}`;
                         const chatId = newMsg.chat_id || mySavedChatId;
 
-                        // Bỏ qua Saved Messages của người khác
                         if (String(chatId).startsWith("saved_") && chatId !== mySavedChatId) return;
 
                         let chat = state.chats.find((c) => c.id === chatId);
 
-                        // Chưa có chat → tạo mới (không cần reload)
                         if (!chat) {
                             const otherName = resolveOtherNameFromChatId(chatId, me, newMsg.sender_username);
                             chat = {
@@ -1870,7 +1842,6 @@
                             });
                         }
 
-                        // Tránh trùng (tin mình vừa gửi local)
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
 
                         chat.messages.push({
@@ -1906,13 +1877,14 @@
         return channel;
     }
 
+    /* ============ INITIALIZATION ============ */
     window.zchatEnterApp = enterApp;
 
     applyLanguage();
     if (currentUsername) {
         enterApp(currentUsername);
     } else {
-        onboarding.classList.remove("hidden");
+        if (onboarding) onboarding.classList.remove("hidden");
     }
 
     subscribeToMessages();
