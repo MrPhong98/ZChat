@@ -438,6 +438,7 @@
     const sidebarScrim = document.getElementById("sidebarScrim");
     const closeSidebarBtn = document.getElementById("closeSidebarBtn");
     const openSidebarBtn = document.getElementById("openSidebarBtn");
+    const bottomNav = document.getElementById("bottomNav");
 
     const searchInput = document.getElementById("searchInput");
     const chatList = document.getElementById("chatList");
@@ -811,12 +812,18 @@
         if (!sidebarWrap) return;
         sidebarWrap.classList.remove("-translate-x-full");
         if (sidebarScrim) sidebarScrim.classList.add("hidden");
+        // Trên mobile, quay lại danh sách chat thì hiện lại bottom nav
+        if (isMobileView() && bottomNav) {
+            bottomNav.classList.remove("hidden");
+        }
     }
     function closeSidebar() {
         // Chỉ ẩn list trên mobile khi vào chat; desktop luôn hiện list
         if (!sidebarWrap) return;
         if (isMobileView()) {
             sidebarWrap.classList.add("-translate-x-full");
+            // Ẩn bottom nav khi đang mở 1 chat trên mobile
+            if (bottomNav) bottomNav.classList.add("hidden");
         } else {
             sidebarWrap.classList.remove("-translate-x-full");
         }
@@ -825,6 +832,16 @@
     if (openSidebarBtn) openSidebarBtn.addEventListener("click", openSidebar);
     if (closeSidebarBtn) closeSidebarBtn.addEventListener("click", closeSidebar);
     if (sidebarScrim) sidebarScrim.addEventListener("click", closeSidebar);
+
+    // Đồng bộ lại trạng thái bottom nav khi resize qua lại giữa mobile/desktop
+    window.addEventListener("resize", () => {
+        if (!bottomNav) return;
+        if (!isMobileView()) {
+            bottomNav.classList.remove("hidden");
+        } else if (state.activeChatId && sidebarWrap && sidebarWrap.classList.contains("-translate-x-full")) {
+            bottomNav.classList.add("hidden");
+        }
+    });
 
     function selectChat(chatId) {
         state.activeChatId = chatId;
