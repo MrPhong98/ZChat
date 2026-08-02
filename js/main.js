@@ -751,11 +751,9 @@
         syncProfileData();
         applyLanguage();
         renderChatList();
-
-        setTimeout(() => {
-            loadMessagesFromSupabase();
-        }, 500);
-
+        
+        loadMessagesFromSupabase();
+        
         renderActiveChat();
         icons();
     }
