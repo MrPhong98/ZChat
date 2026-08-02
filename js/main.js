@@ -1269,7 +1269,10 @@
         if (isMine && !isImage) {
             items.push({ icon: "pencil", label: "Edit message", action: () => startEditMessage(msg.id, body) });
         }
-        items.push({ icon: "copy", label: "Copy message text", action: () => copyMessageText(msg) });
+        // Copy chỉ cho tin text — không hiện với ảnh
+        if (!isImage) {
+            items.push({ icon: "copy", label: "Copy message text", action: () => copyMessageText(msg) });
+        }
         items.push({ icon: "info", label: "Info", action: () => showMessageInfo(msg) });
         if (isMine) {
             items.push({ icon: "trash-2", label: "Delete for all", danger: true, action: () => deleteMessage(msg.id) });
