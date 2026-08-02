@@ -9,6 +9,9 @@
             changeAvatar: "Change avatar",
             colorTab: "Color",
             emojiTab: "Emoji",
+            photoTab: "Photo",
+            uploadPhoto: "Upload photo",
+            uploading: "Uploading...",
             username: "Username",
             usernameErr: "Username can't be empty.",
             status: "Status",
@@ -31,6 +34,9 @@
             changeAvatar: "Đổi ảnh đại diện",
             colorTab: "Màu sắc",
             emojiTab: "Biểu tượng",
+            photoTab: "Ảnh",
+            uploadPhoto: "Tải ảnh lên",
+            uploading: "Đang tải lên...",
             username: "Tên người dùng",
             usernameErr: "Tên người dùng không được để trống.",
             status: "Trạng thái",
@@ -53,6 +59,9 @@
             changeAvatar: "更换头像",
             colorTab: "颜色",
             emojiTab: "表情",
+            photoTab: "照片",
+            uploadPhoto: "上传照片",
+            uploading: "上传中...",
             username: "用户名",
             usernameErr: "用户名不能为空。",
             status: "状态",
@@ -75,6 +84,9 @@
             changeAvatar: "Сменить аватар",
             colorTab: "Цвет",
             emojiTab: "Эмодзи",
+            photoTab: "Фото",
+            uploadPhoto: "Загрузить фото",
+            uploading: "Загрузка...",
             username: "Имя пользователя",
             usernameErr: "Имя пользователя не может быть пустым.",
             status: "Статус",
@@ -109,6 +121,9 @@
         if (tabColor) tabColor.textContent = dict.colorTab;
         const tabEmoji = document.querySelector('.avatar-tab[data-avatar-tab="emoji"]');
         if (tabEmoji) tabEmoji.textContent = dict.emojiTab;
+        const tabPhoto = document.querySelector('.avatar-tab[data-avatar-tab="photo"]');
+        if (tabPhoto) tabPhoto.textContent = dict.photoTab;
+        if (uploadPhotoBtnLabel && !isUploadingAvatar) uploadPhotoBtnLabel.textContent = dict.uploadPhoto;
 
         const labelUsername = document.querySelector("label[for='usernameField']");
         if (labelUsername) labelUsername.textContent = dict.username;
@@ -183,6 +198,7 @@
         avatarType: localStorage.getItem("zchat_avatar_type") || "initials",
         avatarColor: localStorage.getItem("zchat_avatar_color") || colorFor(savedUsername),
         avatarEmoji: localStorage.getItem("zchat_avatar_emoji") || "😀",
+        avatarUrl: localStorage.getItem("zchat_avatar_url") || "",
         theme: localStorage.getItem("zchat_theme") || "dark",
     };
 
@@ -200,6 +216,12 @@
     const avatarPopover = document.getElementById("avatarPopover");
     const colorSwatches = document.getElementById("colorSwatches");
     const emojiSwatches = document.getElementById("emojiSwatches");
+    const photoPanel = document.getElementById("photoPanel");
+    const avatarFileInput = document.getElementById("avatarFileInput");
+    const uploadPhotoBtn = document.getElementById("uploadPhotoBtn");
+    const uploadPhotoBtnLabel = document.getElementById("uploadPhotoBtnLabel");
+    const photoUploadError = document.getElementById("photoUploadError");
+    let isUploadingAvatar = false;
 
     const presenceBtns = document.querySelectorAll(".presence-btn");
 
@@ -215,8 +237,13 @@
 
     /* ============ RENDER ============ */
     function renderAvatarPreview() {
-        avatarPreview.style.backgroundColor = draft.avatarType === "emoji" ? "var(--elevated2)" : draft.avatarColor;
-        avatarPreview.textContent = draft.avatarType === "emoji" ? draft.avatarEmoji : initials(draft.username || savedUsername);
+        if (draft.avatarType === "photo" && draft.avatarUrl) {
+            avatarPreview.style.backgroundColor = "var(--elevated2)";
+            avatarPreview.innerHTML = `<img src="${draft.avatarUrl}" alt="Avatar" class="h-full w-full rounded-full object-cover" />`;
+        } else {
+            avatarPreview.style.backgroundColor = draft.avatarType === "emoji" ? "var(--elevated2)" : draft.avatarColor;
+            avatarPreview.textContent = draft.avatarType === "emoji" ? draft.avatarEmoji : initials(draft.username || savedUsername);
+        }
         presenceDotPreview.style.backgroundColor = PRESENCE_COLORS[draft.presence] || PRESENCE_COLORS.online;
     }
 
@@ -317,11 +344,108 @@
             tab.style.backgroundColor = "var(--ink)";
             tab.style.color = "var(--bubble-sent-text)";
             const isColor = tab.dataset.avatarTab === "color";
+            const isEmoji = tab.dataset.avatarTab === "emoji";
+            const isPhoto = tab.dataset.avatarTab === "photo";
             colorSwatches.classList.toggle("hidden", !isColor);
-            emojiSwatches.classList.toggle("hidden", isColor);
+            emojiSwatches.classList.toggle("hidden", !isEmoji);
+            if (photoPanel) {
+                photoPanel.classList.toggle("hidden", !isPhoto);
+                photoPanel.classList.toggle("flex", isPhoto);
+            }
         });
     });
-    document.querySelector('.avatar-tab[data-avatar-tab="' + (saved.avatarType === "emoji" ? "emoji" : "color") + '"]').click();
+    document.querySelector('.avatar-tab[data-avatar-tab="' + (saved.avatarType === "photo" ? "photo" : saved.avatarType === "emoji" ? "emoji" : "color") + '"]').click();
+
+    /* ============ AVATAR PHOTO UPLOAD (Supabase Storage: bucket "avatars") ============ */
+    const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+    function sanitizeForPath(name) {
+        return (name || "user")
+            .toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // bỏ dấu tiếng Việt
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "user";
+    }
+
+    function setUploadError(message) {
+        if (!photoUploadError) return;
+        if (message) {
+            photoUploadError.textContent = message;
+            photoUploadError.classList.remove("hidden");
+        } else {
+            photoUploadError.classList.add("hidden");
+        }
+    }
+
+    function setUploadingState(uploading) {
+        isUploadingAvatar = uploading;
+        const lang = localStorage.getItem("zchat_lang") || "en";
+        const dict = i18n[lang] || i18n.en;
+        if (uploadPhotoBtn) uploadPhotoBtn.disabled = uploading;
+        if (uploadPhotoBtnLabel) uploadPhotoBtnLabel.textContent = uploading ? dict.uploading : dict.uploadPhoto;
+        if (uploadPhotoBtn) uploadPhotoBtn.style.opacity = uploading ? "0.6" : "1";
+    }
+
+    if (uploadPhotoBtn && avatarFileInput) {
+        uploadPhotoBtn.addEventListener("click", () => {
+            if (isUploadingAvatar) return;
+            avatarFileInput.click();
+        });
+
+        avatarFileInput.addEventListener("change", async () => {
+            const file = avatarFileInput.files && avatarFileInput.files[0];
+            avatarFileInput.value = ""; // cho phép chọn lại cùng 1 file lần sau
+            if (!file) return;
+
+            setUploadError("");
+
+            if (!ALLOWED_MIME.includes(file.type)) {
+                setUploadError("Unsupported file type. Please use PNG, JPG, WEBP or GIF.");
+                return;
+            }
+            if (file.size > MAX_AVATAR_BYTES) {
+                setUploadError("Image is too large. Max size is 5MB.");
+                return;
+            }
+            if (!window.supabaseClient) {
+                setUploadError("Can't connect to storage right now. Please try again later.");
+                return;
+            }
+
+            setUploadingState(true);
+            try {
+                const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+                const path = `${sanitizeForPath(draft.username || savedUsername)}.${ext}`;
+
+                const { error: uploadErr } = await window.supabaseClient
+                    .storage
+                    .from("avatars")
+                    .upload(path, file, { upsert: true, cacheControl: "3600", contentType: file.type });
+
+                if (uploadErr) throw uploadErr;
+
+                const { data: publicUrlData } = window.supabaseClient
+                    .storage
+                    .from("avatars")
+                    .getPublicUrl(path);
+
+                const publicUrl = publicUrlData && publicUrlData.publicUrl;
+                if (!publicUrl) throw new Error("Could not get public URL");
+
+                // Cache-bust để avatar mới hiển thị ngay, không bị trình duyệt/CDN cache ảnh cũ
+                draft.avatarType = "photo";
+                draft.avatarUrl = `${publicUrl}?t=${Date.now()}`;
+                renderAvatarPreview();
+                avatarPopover.classList.add("hidden");
+            } catch (err) {
+                console.error("[ZChat] Avatar upload error:", err);
+                setUploadError(err.message || "Upload failed. Please try again.");
+            } finally {
+                setUploadingState(false);
+            }
+        });
+    }
 
     presenceBtns.forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -366,6 +490,7 @@
         localStorage.setItem("zchat_avatar_type", draft.avatarType);
         localStorage.setItem("zchat_avatar_color", draft.avatarColor);
         localStorage.setItem("zchat_avatar_emoji", draft.avatarEmoji);
+        localStorage.setItem("zchat_avatar_url", draft.avatarUrl || "");
         localStorage.setItem("zchat_theme", draft.theme);
 
         saved.username = name;
