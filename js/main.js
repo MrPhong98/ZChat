@@ -1649,10 +1649,7 @@
                 let chat = state.chats.find((c) => c.id === chatId);
 
                 if (!chat) {
-// If the message doesn't have a sender username, fallback to the current active chat partner's name
-                    const otherName = m.sender_username && m.sender_username !== me
-                        ? m.sender_username
-                        : (window.currentChatUser || "Chat Member");
+                    const otherName = resolveOtherNameFromChatId(chatId, me, m.sender_username);
                     chat = {
                         id: chatId,
                         participant: {
