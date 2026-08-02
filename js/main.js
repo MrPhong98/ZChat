@@ -1915,6 +1915,62 @@
                     }
                 }
             )
+            .on(
+                "postgres_changes",
+                { event: "UPDATE", schema: "public", table: "messages" },
+                (payload) => {
+                    try {
+                        const updatedMsg = payload.new;
+                        if (!updatedMsg) return;
+
+                        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
+                        const meLower = me.toLowerCase();
+                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
+
+                        // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
+                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+
+                        const chat = state.chats.find((c) => c.id === chatId);
+                        if (!chat) return;
+
+                        const msg = chat.messages.find((m) => m.id === updatedMsg.id);
+                        if (!msg) return;
+
+                        msg.text = updatedMsg.content || "";
+                        msg.isEdited = true;
+
+                        if (state.activeChatId === chat.id) renderMessages(chat);
+                        renderChatList();
+                    } catch (err) {
+                        console.error("[ZChat] Realtime UPDATE handler error:", err);
+                    }
+                }
+            )
+            .on(
+                "postgres_changes",
+                { event: "DELETE", schema: "public", table: "messages" },
+                (payload) => {
+                    try {
+                        // Mặc định Supabase chỉ gửi kèm "id" trong payload.old (không có chat_id),
+                        // nên mình tìm trực tiếp trong state.chats — vốn đã chỉ chứa chat của MÌNH rồi,
+                        // nên không lo lộ/xoá nhầm tin nhắn của người khác.
+                        const deletedId = payload.old && payload.old.id;
+                        if (!deletedId) return;
+
+                        for (const chat of state.chats) {
+                            const idx = chat.messages.findIndex((m) => m.id === deletedId);
+                            if (idx === -1) continue;
+
+                            chat.messages.splice(idx, 1);
+                            if (state.activeChatId === chat.id) renderMessages(chat);
+                            renderChatList();
+                            break;
+                        }
+                    } catch (err) {
+                        console.error("[ZChat] Realtime DELETE handler error:", err);
+                    }
+                }
+            )
             .subscribe((status) => {
                 console.log("[ZChat] Realtime status:", status);
                 if (status === "SUBSCRIBED") {
