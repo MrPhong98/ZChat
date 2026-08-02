@@ -1625,11 +1625,17 @@
         }
         try {
             const me = currentUsername || localStorage.getItem("zchat_username") || "";
-            const mySavedChatId = `saved_${me.toLowerCase()}`;
+            const meLower = me.toLowerCase();
+            const mySavedChatId = `saved_${meLower}`;
 
+            if (!meLower) return;
+
+            // Chỉ lấy về tin nhắn thuộc các đoạn chat có liên quan đến MÌNH:
+            // Saved Messages của mình, hoặc chat_id có chứa username của mình.
             const { data, error } = await window.supabaseClient
                 .from("messages")
                 .select("*")
+                .or(`chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
                 .order("created_at", { ascending: true });
 
             if (error) {
@@ -1641,8 +1647,9 @@
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
 
-                // Tránh load tin nhắn Saved Messages của người dùng khác
-                if (chatId.startsWith("saved_") && chatId !== mySavedChatId) {
+                // Chặn lần cuối ở client: bỏ qua bất kỳ chat_id nào không thực sự thuộc về mình
+                // (phòng trường hợp query .or() ở trên bỏ sót định dạng chat_id lạ).
+                if (!isChatIdMine(chatId, meLower)) {
                     return;
                 }
 
@@ -1804,6 +1811,18 @@
     }
 
     /* ============ REALTIME (phải nằm trong IIFE để dùng được state) ============ */
+    /* Kiểm tra 1 chat_id có thực sự thuộc về "me" hay không, tránh việc user khác
+       vô tình (hoặc realtime broadcast) làm lộ / gộp nhầm đoạn chat của 2 người khác. */
+    function isChatIdMine(chatId, meLower) {
+        if (!chatId || !meLower) return false;
+        if (chatId.startsWith("saved_")) return chatId === `saved_${meLower}`;
+        if (chatId.startsWith("chat_")) {
+            const rest = chatId.slice(5);
+            return rest === meLower || rest.startsWith(meLower + "_") || rest.endsWith("_" + meLower);
+        }
+        return false;
+    }
+
     function resolveOtherNameFromChatId(chatId, me, senderUsername) {
         const meL = (me || "").toLowerCase();
         if (!chatId) return senderUsername && senderUsername.toLowerCase() !== meL ? senderUsername : "Chat User";
@@ -1836,11 +1855,13 @@
                         if (!newMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
-                        const mySavedChatId = `saved_${me.toLowerCase()}`;
+                        const meLower = me.toLowerCase();
+                        const mySavedChatId = `saved_${meLower}`;
                         const chatId = newMsg.chat_id || mySavedChatId;
 
-                        // Bỏ qua Saved Messages của người khác
-                        if (String(chatId).startsWith("saved_") && chatId !== mySavedChatId) return;
+                        // Chặn triệt để: bỏ qua bất kỳ tin nhắn nào không thuộc về chat của MÌNH,
+                        // dù là Saved Messages của người khác hay đoạn chat 1-1 của 2 người khác.
+                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
 
                         let chat = state.chats.find((c) => c.id === chatId);
 
