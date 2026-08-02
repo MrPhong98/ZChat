@@ -536,15 +536,24 @@
         const avatarType = localStorage.getItem("zchat_avatar_type") || "initials";
         const avatarColor = localStorage.getItem("zchat_avatar_color") || colorFor(currentUsername);
         const avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || "😀";
+        const avatarUrl = localStorage.getItem("zchat_avatar_url") || "";
 
-        if (avatarType === "emoji") {
-            profileAvatar.style.backgroundColor = "var(--elevated2)";
-            profileAvatar.textContent = avatarEmoji;
-        } else {
-            profileAvatar.style.backgroundColor = avatarColor;
-            profileAvatar.style.color = "var(--avatar-text)";
-            profileAvatar.textContent = initials(currentUsername);
-        }
+        const profileAvatarMobile = document.getElementById("profileAvatarMobile");
+        const targets = [profileAvatar, profileAvatarMobile].filter(Boolean);
+
+        targets.forEach((el) => {
+            if (avatarType === "photo" && avatarUrl) {
+                el.style.backgroundColor = "var(--elevated2)";
+                el.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="h-full w-full rounded-full object-cover" />`;
+            } else if (avatarType === "emoji") {
+                el.style.backgroundColor = "var(--elevated2)";
+                el.textContent = avatarEmoji;
+            } else {
+                el.style.backgroundColor = avatarColor;
+                el.style.color = "var(--avatar-text)";
+                el.textContent = initials(currentUsername);
+            }
+        });
     }
 
     function generateRecoveryPassword() {
