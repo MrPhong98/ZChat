@@ -566,6 +566,10 @@
     const editBar = document.getElementById("editBar");
     const editBarPreview = document.getElementById("editBarPreview");
     const cancelEditBtn = document.getElementById("cancelEditBtn");
+    const replyBar = document.getElementById("replyBar");
+    const replyBarPreview = document.getElementById("replyBarPreview");
+    const replyBarSender = document.getElementById("replyBarSender");
+    const cancelReplyBtn = document.getElementById("cancelReplyBtn");
     const attachBtn = document.getElementById("attachBtn");
     const fileInput = document.getElementById("fileInput");
     const emojiBtn = document.getElementById("emojiBtn");
@@ -585,6 +589,8 @@
 
     // Biến toàn cục theo dõi tin nhắn đang chỉnh sửa
     let editingMsgId = null;
+    // Biến toàn cục theo dõi tin nhắn đang được reply
+    let replyingMsgId = null;
 
     function customConfirm(title, message) {
         return new Promise((resolve) => {
@@ -917,7 +923,7 @@
         list.forEach((chat) => {
             const last = chat.messages[chat.messages.length - 1] || null;
             const isMine = last && last.senderId === "me";
-            const previewText = last ? (last.text || (last.attachment ? "📎 Attachment" : "")) : "No messages yet";
+            const previewText = last ? (previewForMessage(last) || (last.attachment ? "📎 Attachment" : "")) : "No messages yet";
             const active = chat.id === state.activeChatId;
             const receiptIcon =
                 isMine && last
@@ -1063,6 +1069,7 @@
 
     /* ============ ĐIỀU KHIỂN EDIT MODE BẰNG EDIT BAR ============ */
     function startEditMessage(msgId, currentText) {
+        cancelReplyMode();
         editingMsgId = msgId;
 
         messageInput.value = currentText;
@@ -1103,6 +1110,212 @@
     if (cancelEditBtn) {
         cancelEditBtn.addEventListener("click", cancelEditMode);
     }
+
+    /* ============ REPLY (TRẢ LỜI TIN NHẮN) ============ */
+    const REPLY_PREFIX_RE = /^\[REPLY:([^:]+):([^:]*):([^\]]*)\]([\s\S]*)$/;
+
+    function buildReplyPrefix(replyId, replySender, replyPreview) {
+        return `[REPLY:${replyId}:${encodeURIComponent(replySender)}:${encodeURIComponent(replyPreview)}]`;
+    }
+
+    // Tách phần "trả lời ai, preview gì" ra khỏi nội dung thật của tin nhắn
+    function parseReply(text) {
+        if (!text) return { replyId: null, replySender: "", replyPreview: "", body: text || "" };
+        const match = text.match(REPLY_PREFIX_RE);
+        if (!match) return { replyId: null, replySender: "", replyPreview: "", body: text };
+        return {
+            replyId: match[1],
+            replySender: decodeURIComponent(match[2] || ""),
+            replyPreview: decodeURIComponent(match[3] || ""),
+            body: match[4] || "",
+        };
+    }
+
+    function previewForMessage(msg) {
+        if (!msg) return "";
+        const { body } = parseReply(msg.text || "");
+        if (body.startsWith("[IMAGE]:")) return "📷 Photo";
+        if (msg.attachment) return `📎 ${msg.attachment}`;
+        return body;
+    }
+
+    function startReplyMessage(msgId) {
+        cancelEditMode();
+        const chat = state.chats.find((c) => c.id === state.activeChatId);
+        if (!chat) return;
+        const msg = chat.messages.find((m) => m.id === msgId);
+        if (!msg) return;
+
+        replyingMsgId = msgId;
+        const senderLabel = msg.senderId === "me" ? "yourself" : chat.participant.name;
+
+        if (replyBarSender) replyBarSender.textContent = senderLabel;
+        if (replyBarPreview) replyBarPreview.textContent = previewForMessage(msg) || "…";
+        if (replyBar) replyBar.classList.remove("hidden");
+
+        messageInput.focus();
+        updateSendBtnState();
+    }
+
+    function cancelReplyMode() {
+        replyingMsgId = null;
+        if (replyBar) replyBar.classList.add("hidden");
+    }
+
+    if (cancelReplyBtn) {
+        cancelReplyBtn.addEventListener("click", cancelReplyMode);
+    }
+
+    // Cuộn tới + highlight tin nhắn gốc khi bấm vào khối trích dẫn reply
+    function scrollToMessage(msgId) {
+        const el = document.getElementById(`msg-${msgId}`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("msg-highlight-flash");
+        setTimeout(() => el.classList.remove("msg-highlight-flash"), 1200);
+    }
+
+    function showSimpleToast(message, iconName) {
+        const toast = document.getElementById("zchatToast");
+        if (!toast) return;
+        toast.innerHTML = `<span class="toast-icon"><i data-lucide="${iconName || "check"}" class="w-4 h-4"></i></span><span>${escapeHtml(message)}</span>`;
+        if (window.lucide) window.lucide.createIcons({ nodes: [toast] });
+        toast.classList.add("show");
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 2400);
+    }
+
+    async function copyMessageText(msg) {
+        const { body } = parseReply(msg.text || "");
+        const textToCopy = body.startsWith("[IMAGE]:") ? body.replace("[IMAGE]:", "") : body;
+        if (!textToCopy) return;
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+        } catch (err) {
+            const ta = document.createElement("textarea");
+            ta.value = textToCopy;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+        }
+        showSimpleToast("Copied to clipboard", "copy-check");
+    }
+
+    function showMessageInfo(msg) {
+        const sentDate = new Date(msg.createdAt);
+        const full = sentDate.toLocaleString(undefined, {
+            weekday: "long", year: "numeric", month: "long", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+        });
+
+        let panel = document.getElementById("zchatMsgInfoPanel");
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.id = "zchatMsgInfoPanel";
+            panel.className = "fixed inset-0 z-[200] hidden items-center justify-center p-4";
+            panel.style.backgroundColor = "rgba(0,0,0,0.6)";
+            document.body.appendChild(panel);
+            panel.addEventListener("click", (e) => {
+                if (e.target === panel) panel.classList.add("hidden");
+            });
+        }
+
+        panel.innerHTML = `
+            <div class="w-full max-w-xs rounded-2xl p-5 fade-in" style="background-color: var(--elevated2); border: 1px solid var(--transparent-border);">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold" style="color: var(--ink);">Message Info</h3>
+                    <button type="button" id="zchatMsgInfoClose" class="p-1 rounded-full hover:bg-elevated2" style="color: var(--muted);">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="flex flex-col gap-2 text-xs" style="color: var(--muted);">
+                    <div class="flex justify-between gap-3">
+                        <span>Sent</span>
+                        <span class="text-right font-medium" style="color: var(--ink);">${escapeHtml(full)}</span>
+                    </div>
+                    ${msg.isEdited ? `<div class="flex justify-between gap-3"><span>Status</span><span class="font-medium" style="color: var(--ink);">Edited</span></div>` : ""}
+                </div>
+            </div>`;
+
+        panel.classList.remove("hidden");
+        panel.classList.add("flex");
+        icons();
+
+        const closeBtn = document.getElementById("zchatMsgInfoClose");
+        if (closeBtn) closeBtn.addEventListener("click", () => panel.classList.add("hidden"));
+    }
+
+    /* ============ MENU 3 CHẤM (Reply / Edit / Copy / Info / Delete for all) ============ */
+    function closeMessageActionMenu() {
+        const existing = document.getElementById("zchatMsgActionMenu");
+        if (existing) existing.remove();
+        document.removeEventListener("click", closeMessageActionMenuOnOutsideClick, true);
+    }
+
+    function closeMessageActionMenuOnOutsideClick(e) {
+        const menu = document.getElementById("zchatMsgActionMenu");
+        if (menu && !menu.contains(e.target)) closeMessageActionMenu();
+    }
+
+    function openMessageActionMenu(msg, chat, isMine, clientX, clientY) {
+        closeMessageActionMenu();
+
+        const { body } = parseReply(msg.text || "");
+        const isImage = body.startsWith("[IMAGE]:");
+
+        const items = [];
+        items.push({ icon: "corner-up-left", label: "Reply", action: () => startReplyMessage(msg.id) });
+        if (isMine && !isImage) {
+            items.push({ icon: "pencil", label: "Edit message", action: () => startEditMessage(msg.id, body) });
+        }
+        items.push({ icon: "copy", label: "Copy message text", action: () => copyMessageText(msg) });
+        items.push({ icon: "info", label: "Info", action: () => showMessageInfo(msg) });
+        if (isMine) {
+            items.push({ icon: "trash-2", label: "Delete for all", danger: true, action: () => deleteMessage(msg.id) });
+        }
+
+        const menu = document.createElement("div");
+        menu.id = "zchatMsgActionMenu";
+        menu.className = "msg-action-menu fade-in";
+        menu.innerHTML = items.map((item) => `
+            <button type="button" class="msg-action-item ${item.danger ? "danger" : ""}" data-action="${item.label}">
+                <i data-lucide="${item.icon}" class="msg-action-icon"></i>
+                <span>${item.label}</span>
+            </button>`).join("");
+
+        document.body.appendChild(menu);
+        icons();
+
+        // Định vị menu trong khung nhìn, không để tràn ra ngoài màn hình
+        const menuRect = menu.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        let left = clientX;
+        let top = clientY;
+        if (left + menuRect.width > vw - 12) left = vw - menuRect.width - 12;
+        if (left < 12) left = 12;
+        if (top + menuRect.height > vh - 12) top = vh - menuRect.height - 12;
+        if (top < 12) top = 12;
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+
+        menu.querySelectorAll(".msg-action-item").forEach((btn, idx) => {
+            btn.addEventListener("click", () => {
+                closeMessageActionMenu();
+                items[idx].action();
+            });
+        });
+
+        setTimeout(() => {
+            document.addEventListener("click", closeMessageActionMenuOnOutsideClick, true);
+        }, 0);
+    }
+
+    if (messageFeed) {
+        messageFeed.addEventListener("scroll", closeMessageActionMenu, { passive: true });
+    }
+    window.addEventListener("resize", closeMessageActionMenu);
 
     /* ============ CHỈNH SỬA & XÓA TIN NHẮN (EDIT & DELETE) ============ */
     async function deleteMessage(msgId) {
@@ -1191,43 +1404,39 @@
                 ? "background-color: var(--ink); color: var(--canvas);"
                 : "background-color: var(--elevated); color: var(--ink);";
 
+            // Tách phần "đang trả lời tin nhắn nào" ra khỏi nội dung thật
+            const { replyId, replySender, replyPreview, body } = parseReply(msg.text || "");
+
             let contentHtml = "";
             let isImageMsg = false;
-            if (msg.text) {
-                if (msg.text.startsWith("[IMAGE]:")) {
+            if (body) {
+                if (body.startsWith("[IMAGE]:")) {
                     isImageMsg = true;
-                    const imgUrl = msg.text.replace("[IMAGE]:", "");
+                    const imgUrl = body.replace("[IMAGE]:", "");
                     contentHtml = `<img src="${imgUrl}" class="msg-image block rounded-2xl max-w-[260px] max-h-[300px] object-cover cursor-pointer hover:opacity-95 transition-opacity" data-full-src="${imgUrl}" />`;
                 } else {
-                    contentHtml = escapeHtml(msg.text) + (msg.isEdited ? ` <span class="text-[10px] opacity-60 font-normal">(edited)</span>` : "");
+                    contentHtml = escapeHtml(body) + (msg.isEdited ? ` <span class="text-[10px] opacity-60 font-normal">(edited)</span>` : "");
                 }
             }
 
-            let actionButtonsHtml = "";
-            if (isMine && !msg.text?.startsWith("[IMAGE]:")) {
-                actionButtonsHtml = `
-                <div class="absolute top-1/2 -translate-y-1/2 -left-16 hidden group-hover:flex items-center gap-1 bg-elevated rounded-xl p-1 shadow-md border border-hairline z-10 transition-all">
-                    <button type="button" class="btn-edit-msg p-1.5 hover:bg-elevated2 rounded-lg text-muted hover:text-ink transition-colors" title="Edit message">
-                        <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button type="button" class="btn-delete-msg p-1.5 hover:bg-elevated2 rounded-lg text-red-500 transition-colors" title="Delete message">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    </button>
-                </div>`;
-            } else if (isMine && msg.text?.startsWith("[IMAGE]:")) {
-                actionButtonsHtml = `
-                <div class="absolute top-1/2 -translate-y-1/2 -left-10 hidden group-hover:flex items-center gap-1 bg-elevated rounded-xl p-1 shadow-md border border-hairline z-10 transition-all">
-                    <button type="button" class="btn-delete-msg p-1.5 hover:bg-elevated2 rounded-lg text-red-500 transition-colors" title="Delete message">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    </button>
-                </div>`;
-            }
-
-            const bubble = msg.text
-                ? (isImageMsg
-                    ? contentHtml
-                    : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${contentHtml}</div>`)
+            const replyQuoteHtml = replyId
+                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
+                     <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
+                     <span class="text-[11px] truncate opacity-70" style="color: var(--ink);">${escapeHtml(replyPreview)}</span>
+                   </div>`
                 : "";
+
+            // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
+            const menuBtnHtml = `
+                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all z-10" style="color: var(--muted);" title="More">
+                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                </button>`;
+
+            const bubbleInner = isImageMsg
+                ? `${replyQuoteHtml}${contentHtml}`
+                : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
+
+            const bubble = body ? `<div class="msg-bubble-pressable">${bubbleInner}</div>` : "";
 
             const disappearingOn = chat.disappearingTime && chat.disappearingTime !== "off";
             const timerIcon = disappearingOn
@@ -1246,25 +1455,70 @@
 
             wrap.innerHTML = `
         <div class="relative flex max-w-[72%] flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
-          ${actionButtonsHtml}
+          ${menuBtnHtml}
           ${attachmentHtml}
           ${bubble}
           ${meta}
         </div>`;
 
-            const btnEdit = wrap.querySelector(".btn-edit-msg");
-            if (btnEdit) {
-                btnEdit.addEventListener("click", () => startEditMessage(msg.id, msg.text));
-            }
-
-            const btnDelete = wrap.querySelector(".btn-delete-msg");
-            if (btnDelete) {
-                btnDelete.addEventListener("click", () => deleteMessage(msg.id));
+            const btnMenu = wrap.querySelector(".btn-msg-menu");
+            if (btnMenu) {
+                btnMenu.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const rect = btnMenu.getBoundingClientRect();
+                    openMessageActionMenu(msg, chat, isMine, rect.left, rect.bottom + 4);
+                });
             }
 
             const imgEl = wrap.querySelector(".msg-image");
             if (imgEl) {
                 imgEl.addEventListener("click", () => openImageLightbox(imgEl.dataset.fullSrc));
+            }
+
+            const quoteEl = wrap.querySelector(".msg-reply-quote");
+            if (quoteEl) {
+                quoteEl.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    scrollToMessage(quoteEl.dataset.replyTarget);
+                });
+            }
+
+            // Nhấn giữ (long-press) trên mobile để mở menu ngay tại điểm chạm
+            const pressable = wrap.querySelector(".msg-bubble-pressable");
+            if (pressable) {
+                let pressTimer = null;
+                let pressStartX = 0, pressStartY = 0, pressMoved = false;
+
+                const clearPress = () => {
+                    if (pressTimer) clearTimeout(pressTimer);
+                    pressTimer = null;
+                    pressable.classList.remove("is-pressing");
+                };
+
+                pressable.addEventListener("touchstart", (e) => {
+                    if (imgEl && e.target.closest(".msg-reply-quote")) return;
+                    const touch = e.touches[0];
+                    pressStartX = touch.clientX;
+                    pressStartY = touch.clientY;
+                    pressMoved = false;
+                    pressTimer = setTimeout(() => {
+                        pressable.classList.add("is-pressing");
+                        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
+                        openMessageActionMenu(msg, chat, isMine, touch.clientX, touch.clientY);
+                        clearPress();
+                    }, 480);
+                }, { passive: true });
+
+                pressable.addEventListener("touchmove", (e) => {
+                    const touch = e.touches[0];
+                    if (Math.abs(touch.clientX - pressStartX) > 10 || Math.abs(touch.clientY - pressStartY) > 10) {
+                        pressMoved = true;
+                        clearPress();
+                    }
+                }, { passive: true });
+
+                pressable.addEventListener("touchend", clearPress);
+                pressable.addEventListener("touchcancel", clearPress);
             }
 
             messageFeed.appendChild(wrap);
@@ -1479,7 +1733,11 @@
         if (editingMsgId) {
             const msg = chat.messages.find((m) => m.id === editingMsgId);
             if (msg) {
-                msg.text = text;
+                // Giữ nguyên phần "đang trả lời ai" (nếu có) khi sửa nội dung
+                const { replyId, replySender, replyPreview } = parseReply(msg.text || "");
+                const newText = replyId ? buildReplyPrefix(replyId, replySender, replyPreview) + text : text;
+
+                msg.text = newText;
                 msg.isEdited = true;
                 renderMessages(chat);
                 renderChatList();
@@ -1488,7 +1746,7 @@
                     try {
                         await window.supabaseClient
                             .from("messages")
-                            .update({ content: text })
+                            .update({ content: newText })
                             .eq("id", editingMsgId);
                     } catch (err) {
                         console.error("[ZChat] Update Supabase error:", err);
@@ -1500,7 +1758,18 @@
         }
 
         // Trường hợp gửi tin nhắn mới
-        const msg = { id: uid("m"), senderId: "me", text: text, createdAt: Date.now(), status: "sending" };
+        let finalText = text;
+        if (replyingMsgId) {
+            const repliedMsg = chat.messages.find((m) => m.id === replyingMsgId);
+            if (repliedMsg) {
+                const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
+                const senderName = repliedMsg.senderId === "me" ? me : chat.participant.name;
+                finalText = buildReplyPrefix(replyingMsgId, senderName, previewForMessage(repliedMsg)) + text;
+            }
+        }
+        cancelReplyMode();
+
+        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "sending" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
         scheduleDisappearing(chat, msg);
