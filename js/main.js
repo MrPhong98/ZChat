@@ -1451,38 +1451,53 @@
         document.body.appendChild(menu);
         icons();
 
-        // Định vị menu ngay cạnh tin nhắn (mobile + desktop)
-        const menuW = menu.offsetWidth || 200;
-        const menuH = menu.offsetHeight || 180;
-        const pad = 12;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
+        // Tắt transform của animation để fixed không bị lệch trên mobile
+        menu.style.animation = "none";
+        menu.style.opacity = "1";
+        menu.style.transform = "none";
+        menu.style.position = "fixed";
+        menu.style.zIndex = "300";
 
-        let anchorX = Number(clientX);
-        let anchorY = Number(clientY);
-        if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) {
-            anchorX = vw / 2;
-            anchorY = vh / 2;
-        }
+        const placeMenu = () => {
+            const menuW = Math.max(menu.offsetWidth || 0, 180);
+            const menuH = Math.max(menu.offsetHeight || 0, 120);
+            const pad = 10;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
 
-        // Tin của mình (bên phải): neo menu về phía phải; tin người khác: neo trái
-        let left = isMine ? anchorX - menuW + 32 : anchorX;
-        left = Math.max(pad, Math.min(left, vw - menuW - pad));
+            let ax = Number(clientX);
+            let ay = Number(clientY);
+            if (!Number.isFinite(ax) || !Number.isFinite(ay) || (ax === 0 && ay === 0)) {
+                ax = vw / 2;
+                ay = vh / 2;
+            }
 
-        // Ưu tiên mở dưới điểm neo; không đủ chỗ (text box) thì mở phía trên
-        const composerEl = document.querySelector("#activeChat .absolute.bottom-0");
-        const limitBottom = composerEl
-            ? Math.min(vh - pad, composerEl.getBoundingClientRect().top - 8)
-            : vh - pad;
+            // Neo gần nút: tin mình lệch trái menu, tin kia lệch phải nhẹ
+            let left = isMine ? ax - menuW + 28 : ax - 8;
+            left = Math.max(pad, Math.min(left, vw - menuW - pad));
 
-        let top = anchorY;
-        if (top + menuH > limitBottom) {
-            const above = anchorY - menuH - 8;
-            top = above >= pad ? above : Math.max(pad, limitBottom - menuH);
-        }
+            const composerEl = document.getElementById("composerBar")
+                || document.querySelector("#activeChat .absolute.bottom-0");
+            const composerTop = composerEl
+                ? composerEl.getBoundingClientRect().top
+                : vh;
+            const limitBottom = Math.min(vh - pad, composerTop - 6);
 
-        menu.style.left = `${Math.round(left)}px`;
-        menu.style.top = `${Math.round(top)}px`;
+            // Ưu tiên dưới nút; không đủ chỗ thì mở trên nút (vẫn gần tin nhắn)
+            let top = ay + 4;
+            if (top + menuH > limitBottom) {
+                top = ay - menuH - 4;
+            }
+            if (top < pad) top = pad;
+            if (top + menuH > limitBottom) top = Math.max(pad, limitBottom - menuH);
+
+            menu.style.left = Math.round(left) + "px";
+            menu.style.top = Math.round(top) + "px";
+        };
+
+        // Đợi layout xong rồi đặt vị trí (tránh offsetWidth = 0 trên mobile)
+        placeMenu();
+        requestAnimationFrame(placeMenu);
 
         menu.querySelectorAll(".msg-action-item").forEach((btn, idx) => {
             btn.addEventListener("click", () => {
@@ -1612,7 +1627,7 @@
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
             const menuBtnHtml = `
-                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all z-10" style="color: var(--muted);" title="More">
+                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-40 hover:opacity-100 hover:bg-elevated2 transition-all" style="color: var(--muted); z-index: 1;" title="More">
                     <i data-lucide="more-vertical" class="w-4 h-4"></i>
                 </button>`;
 
