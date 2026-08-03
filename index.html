@@ -537,7 +537,7 @@
                                             class="flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all border"
                                             style="background-color: var(--elevated); border-color: var(--transparent-border); color: var(--ink);">
                                         <i data-lucide="timer" class="w-3.5 h-3.5" id="disappearingActiveIcon"
-                                           style="display: none; color: #10b981;"></i>
+                                           style="display: none; color: #1b98e0;"></i>
                                         <span id="currentDisappearingLabel">Off</span>
                                         <i data-lucide="chevron-down"
                                            class="w-3.5 h-3.5 transition-transform duration-200"
@@ -545,57 +545,53 @@
                                     </button>
 
                                     <div id="disappearingMenuPopup"
-                                         class="hidden absolute right-0 bottom-full mb-2 w-48 rounded-2xl p-2 shadow-2xl fade-in"
+                                         class="hidden absolute right-0 bottom-full mb-2 w-56 rounded-3xl p-2.5 shadow-2xl fade-in"
                                          style="background-color: var(--elevated2); border: 1px solid var(--transparent-border); z-index: 70;">
+                                        <p class="px-2.5 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider" style="color: var(--muted);">Auto-delete after</p>
                                         <button type="button" data-value="off"
-                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                class="disappearing-option w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-semibold rounded-2xl transition-all"
                                                 style="color: var(--ink);">
-                                            <span class="flex items-center gap-2.5">
-                                                <i data-lucide="ban" class="w-3.5 h-3.5 opacity-60"></i>
-                                                <span class="opt-label">Off</span>
+                                            <span class="opt-icon-badge flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style="background-color: var(--elevated);">
+                                                <i data-lucide="ban" class="w-4 h-4 opacity-70"></i>
                                             </span>
-                                            <i data-lucide="check"
-                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                            <span class="opt-label flex-1 text-left">Off</span>
+                                            <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon" style="color: #1b98e0;"></i>
                                         </button>
                                         <button type="button" data-value="10s"
-                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                class="disappearing-option w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-semibold rounded-2xl transition-all"
                                                 style="color: var(--ink);">
-                                            <span class="flex items-center gap-2.5">
-                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
-                                                <span class="opt-label">10 seconds</span>
+                                            <span class="opt-icon-badge flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style="background-color: var(--elevated);">
+                                                <i data-lucide="timer" class="w-4 h-4 opacity-70"></i>
                                             </span>
-                                            <i data-lucide="check"
-                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                            <span class="opt-label flex-1 text-left">10 seconds</span>
+                                            <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon" style="color: #1b98e0;"></i>
                                         </button>
                                         <button type="button" data-value="1m"
-                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                class="disappearing-option w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-semibold rounded-2xl transition-all"
                                                 style="color: var(--ink);">
-                                            <span class="flex items-center gap-2.5">
-                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
-                                                <span class="opt-label">1 minute</span>
+                                            <span class="opt-icon-badge flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style="background-color: var(--elevated);">
+                                                <i data-lucide="timer" class="w-4 h-4 opacity-70"></i>
                                             </span>
-                                            <i data-lucide="check"
-                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                            <span class="opt-label flex-1 text-left">1 minute</span>
+                                            <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon" style="color: #1b98e0;"></i>
                                         </button>
                                         <button type="button" data-value="10m"
-                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                class="disappearing-option w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-semibold rounded-2xl transition-all"
                                                 style="color: var(--ink);">
-                                            <span class="flex items-center gap-2.5">
-                                                <i data-lucide="timer" class="w-3.5 h-3.5 opacity-60"></i>
-                                                <span class="opt-label">10 minutes</span>
+                                            <span class="opt-icon-badge flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style="background-color: var(--elevated);">
+                                                <i data-lucide="timer" class="w-4 h-4 opacity-70"></i>
                                             </span>
-                                            <i data-lucide="check"
-                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                            <span class="opt-label flex-1 text-left">10 minutes</span>
+                                            <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon" style="color: #1b98e0;"></i>
                                         </button>
                                         <button type="button" data-value="24h"
-                                                class="disappearing-option w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-[13px] font-medium rounded-xl transition-all"
+                                                class="disappearing-option w-full flex items-center gap-3 px-2.5 py-2 text-[13px] font-semibold rounded-2xl transition-all"
                                                 style="color: var(--ink);">
-                                            <span class="flex items-center gap-2.5">
-                                                <i data-lucide="clock" class="w-3.5 h-3.5 opacity-60"></i>
-                                                <span class="opt-label">24 hours</span>
+                                            <span class="opt-icon-badge flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style="background-color: var(--elevated);">
+                                                <i data-lucide="clock" class="w-4 h-4 opacity-70"></i>
                                             </span>
-                                            <i data-lucide="check"
-                                               class="w-3.5 h-3.5 opacity-0 text-emerald-500 check-icon"></i>
+                                            <span class="opt-label flex-1 text-left">24 hours</span>
+                                            <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon" style="color: #1b98e0;"></i>
                                         </button>
                                     </div>
                                 </div>
