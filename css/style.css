@@ -62,9 +62,9 @@ textarea { field-sizing: content; }
     -webkit-user-select: none !important;
 }
 
-/* ÉP CÔNG TẮC BLOCK SCREENSHOTS SANG MÀU XANH LÁ CHUẨN KHI BẬT */
+/* ÉP CÔNG TẮC BLOCK SCREENSHOTS SANG MÀU XANH DƯƠNG CHUẨN KHI BẬT */
 #blockScreenshotsToggle:checked + div {
-    background-color: #10b981 !important;
+    background-color: #1b98e0 !important;
 }
 
 /* Custom toast – no browser alert */
@@ -103,13 +103,21 @@ textarea { field-sizing: content; }
 
 /* Modern disappearing dropdown */
 #disappearingMenuPopup {
-    min-width: 188px;
+    min-width: 220px;
 }
 .disappearing-option { letter-spacing: 0.01em; }
 .disappearing-option:hover { background-color: var(--surface) !important; }
 .disappearing-option.is-selected {
-    background-color: rgba(16, 185, 129, 0.12);
-    color: #10b981 !important;
+    background-color: rgba(27, 152, 224, 0.12);
+    color: #1b98e0 !important;
+}
+.disappearing-option.is-selected .opt-icon-badge {
+    background-color: rgba(27, 152, 224, 0.18) !important;
+}
+.disappearing-option.is-selected .opt-icon-badge svg,
+.disappearing-option.is-selected .opt-icon-badge i {
+    color: #1b98e0 !important;
+    opacity: 1 !important;
 }
 
 /* Bong bóng chat của mình: xanh + chữ trắng (dark/light + ô reply bên trong) */
