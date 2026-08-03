@@ -15,7 +15,7 @@
             startConvTitle: "Start conversation",
             startConvDesc: "Pick a chat from the list, or start a new one.",
             newChatBtn: "New chat",
-            typeMessage: "Write a message...",
+            typeMessage: "Message",
             newChatModalTitle: "New Conversation",
             newChatModalDesc: "Enter the name or username of the person you want to chat with:",
             startChatBtn: "Start Chat",
