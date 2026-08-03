@@ -424,10 +424,11 @@
                 </header>
 
                 <!-- Messages Feed -->
-                <div id="messageFeed" class="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-4 py-5 sm:px-8"></div>
+                <div id="messageFeed" class="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-4 py-5 pb-24 sm:px-8"></div>
 
-                <!-- Composer -->
-                <div class="px-4 py-3 sm:px-6 relative" style="border-top: 1px solid var(--hairline);">
+                <!-- Composer (nổi đè lên trên tin nhắn, không có nền riêng) -->
+                <div class="absolute bottom-0 left-0 right-0 px-4 py-3 sm:px-6"
+                     style="backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);">
                     <div id="emojiPopover"
                          class="hidden absolute bottom-full right-4 mb-2 grid grid-cols-6 gap-1 rounded-2xl p-2 shadow-lg"
                          style="background-color: var(--elevated);"></div>
@@ -464,7 +465,7 @@
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
-                        <div class="flex flex-1 min-h-10 items-center gap-2 rounded-full px-4"
+                        <div class="flex flex-1 min-h-10 items-center gap-1.5 rounded-full pl-4 pr-1.5"
                              style="background-color: var(--elevated); box-shadow: 0 2px 10px rgba(0,0,0,0.12);">
                             <textarea
                                     id="messageInput"
@@ -479,13 +480,13 @@
                                     style="color: var(--muted);">
                                 <i data-lucide="smile" class="w-[19px] h-[19px]"></i>
                             </button>
-                        </div>
 
-                        <button type="button" id="sendBtn" aria-label="Send message" disabled
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
-                                style="background-color: #1b98e0; color: #ffffff;">
-                            <i id="sendIcon" data-lucide="arrow-up" class="w-[18px] h-[18px]"></i>
-                        </button>
+                            <button type="button" id="sendBtn" aria-label="Send message" disabled
+                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
+                                    style="background-color: #1b98e0; color: #ffffff;">
+                                <i id="sendIcon" data-lucide="arrow-up" class="w-[16px] h-[16px]"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
