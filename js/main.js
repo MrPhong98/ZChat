@@ -1451,15 +1451,20 @@
         document.body.appendChild(menu);
         icons();
 
-        // Định vị menu trong khung nhìn, không để tràn ra ngoài màn hình
+        // Định vị menu trong khung nhìn, tránh đè lên text box (composer)
         const menuRect = menu.getBoundingClientRect();
         const vw = window.innerWidth;
         const vh = window.innerHeight;
+        const composerEl = document.querySelector("#activeChat .absolute.bottom-0");
+        const composerTop = composerEl
+            ? composerEl.getBoundingClientRect().top
+            : vh - 80;
+        const maxBottom = Math.min(vh - 12, composerTop - 8);
         let left = clientX;
         let top = clientY;
         if (left + menuRect.width > vw - 12) left = vw - menuRect.width - 12;
         if (left < 12) left = 12;
-        if (top + menuRect.height > vh - 12) top = vh - menuRect.height - 12;
+        if (top + menuRect.height > maxBottom) top = maxBottom - menuRect.height;
         if (top < 12) top = 12;
         menu.style.left = `${left}px`;
         menu.style.top = `${top}px`;
@@ -1592,7 +1597,7 @@
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
             const menuBtnHtml = `
-                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all z-10" style="color: var(--muted);" title="More">
+                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all" style="color: var(--muted);" title="More">
                     <i data-lucide="more-vertical" class="w-4 h-4"></i>
                 </button>`;
 
