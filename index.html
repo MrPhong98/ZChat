@@ -456,33 +456,35 @@
                         </button>
                     </div>
 
-                    <div class="flex items-end gap-2 rounded-[26px] px-2 py-2"
-                         style="background-color: var(--elevated);">
+                    <div class="flex items-center gap-2">
                         <button type="button" id="attachBtn" aria-label="Attach file"
-                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
-                                style="color: var(--muted);">
-                            <i data-lucide="paperclip" class="w-[19px] h-[19px]"></i>
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                style="background-color: var(--elevated); color: var(--muted);">
+                            <i data-lucide="plus" class="w-[19px] h-[19px]"></i>
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
-                        <textarea
-                                id="messageInput"
-                                rows="1"
-                                placeholder="Write a message..."
-                                class="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
-                                style="color: var(--ink);"
-                        ></textarea>
+                        <div class="flex flex-1 min-h-10 items-center gap-2 rounded-full px-4"
+                             style="background-color: var(--elevated); box-shadow: 0 2px 10px rgba(0,0,0,0.12);">
+                            <textarea
+                                    id="messageInput"
+                                    rows="1"
+                                    placeholder="Write a message..."
+                                    class="max-h-40 flex-1 resize-none bg-transparent py-2 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
+                                    style="color: var(--ink);"
+                            ></textarea>
 
-                        <button type="button" id="emojiBtn" aria-label="Emoji picker"
-                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
-                                style="color: var(--muted);">
-                            <i data-lucide="smile" class="w-[19px] h-[19px]"></i>
-                        </button>
+                            <button type="button" id="emojiBtn" aria-label="Emoji picker"
+                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                    style="color: var(--muted);">
+                                <i data-lucide="smile" class="w-[19px] h-[19px]"></i>
+                            </button>
+                        </div>
 
                         <button type="button" id="sendBtn" aria-label="Send message" disabled
-                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
-                                style="background-color: var(--ink); color: var(--canvas);">
-                            <i id="sendIcon" data-lucide="send-horizontal" class="w-[17px] h-[17px]"></i>
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
+                                style="background-color: #1b98e0; color: #ffffff;">
+                            <i id="sendIcon" data-lucide="arrow-up" class="w-[18px] h-[18px]"></i>
                         </button>
                     </div>
                 </div>
