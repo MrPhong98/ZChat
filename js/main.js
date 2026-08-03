@@ -1565,12 +1565,12 @@
                 ? `<i data-lucide="timer" class="w-[11px] h-[11px] shrink-0" style="color: var(--faint); opacity: 0.85;" title="Disappearing message"></i>`
                 : "";
 
-            const meta = showTail
-                ? `<div class="flex items-center gap-1 px-1 text-[11px]" style="color: var(--faint);">
-             ${timerIcon}
-             <span>${formatTimeShort(msg.createdAt)}</span>
-             ${isMine ? statusIconMarkup(msg.status) : ""}
-           </div>`
+            const seenHtml = isMine ? statusIconMarkup(msg.status) : "";
+            const metaInner = `${timerIcon}${seenHtml}`;
+            const hasMetaContent = !!timerIcon || !!seenHtml;
+
+            const meta = (showTail && hasMetaContent)
+                ? `<div class="flex items-center gap-1 px-1 text-[11px]" style="color: var(--faint);">${metaInner}</div>`
                 : (disappearingOn
                     ? `<div class="flex items-center gap-1 px-1 text-[11px]" style="color: var(--faint);">${timerIcon}</div>`
                     : "");
@@ -1799,9 +1799,9 @@
         currentDisappearingLabel.textContent = labels[value] || dict.optionOff;
 
         if (value && value !== "off") {
-            disappearingMenuBtn.style.backgroundColor = "rgba(16, 185, 129, 0.15)";
-            disappearingMenuBtn.style.borderColor = "#10b981";
-            disappearingMenuBtn.style.color = "#10b981";
+            disappearingMenuBtn.style.backgroundColor = "rgba(27, 152, 224, 0.15)";
+            disappearingMenuBtn.style.borderColor = "#1b98e0";
+            disappearingMenuBtn.style.color = "#1b98e0";
             disappearingActiveIcon.style.display = "inline-block";
         } else {
             disappearingMenuBtn.style.backgroundColor = "var(--elevated)";
