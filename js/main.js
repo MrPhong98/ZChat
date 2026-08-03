@@ -1570,6 +1570,15 @@
             return;
         }
 
+        // Chỉ hiện chữ Seen ở tin nhắn cuối cùng của mình (khi đã đọc)
+        let lastMineIdx = -1;
+        for (let j = msgs.length - 1; j >= 0; j--) {
+            if (msgs[j].senderId === "me") {
+                lastMineIdx = j;
+                break;
+            }
+        }
+
         msgs.forEach((msg, i) => {
             const prev = msgs[i - 1];
             const next = msgs[i + 1];
@@ -1642,7 +1651,7 @@
                 ? `<i data-lucide="timer" class="w-[11px] h-[11px] shrink-0" style="color: var(--faint); opacity: 0.85;" title="Disappearing message"></i>`
                 : "";
 
-            const seenHtml = isMine ? statusIconMarkup(msg.status) : "";
+            const seenHtml = (isMine && i === lastMineIdx) ? statusIconMarkup(msg.status) : "";
             const metaInner = `${timerIcon}${seenHtml}`;
             const hasMetaContent = !!timerIcon || !!seenHtml;
 
