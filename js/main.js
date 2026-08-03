@@ -1451,23 +1451,38 @@
         document.body.appendChild(menu);
         icons();
 
-        // Định vị menu trong khung nhìn, tránh đè lên text box
-        const menuRect = menu.getBoundingClientRect();
+        // Định vị menu ngay cạnh tin nhắn (mobile + desktop)
+        const menuW = menu.offsetWidth || 200;
+        const menuH = menu.offsetHeight || 180;
+        const pad = 12;
         const vw = window.innerWidth;
         const vh = window.innerHeight;
+
+        let anchorX = Number(clientX);
+        let anchorY = Number(clientY);
+        if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY)) {
+            anchorX = vw / 2;
+            anchorY = vh / 2;
+        }
+
+        // Tin của mình (bên phải): neo menu về phía phải; tin người khác: neo trái
+        let left = isMine ? anchorX - menuW + 32 : anchorX;
+        left = Math.max(pad, Math.min(left, vw - menuW - pad));
+
+        // Ưu tiên mở dưới điểm neo; không đủ chỗ (text box) thì mở phía trên
         const composerEl = document.querySelector("#activeChat .absolute.bottom-0");
-        const composerTop = composerEl
-            ? composerEl.getBoundingClientRect().top
-            : vh - 80;
-        const maxBottom = Math.min(vh - 12, composerTop - 8);
-        let left = clientX;
-        let top = clientY;
-        if (left + menuRect.width > vw - 12) left = vw - menuRect.width - 12;
-        if (left < 12) left = 12;
-        if (top + menuRect.height > maxBottom) top = maxBottom - menuRect.height;
-        if (top < 12) top = 12;
-        menu.style.left = `${left}px`;
-        menu.style.top = `${top}px`;
+        const limitBottom = composerEl
+            ? Math.min(vh - pad, composerEl.getBoundingClientRect().top - 8)
+            : vh - pad;
+
+        let top = anchorY;
+        if (top + menuH > limitBottom) {
+            const above = anchorY - menuH - 8;
+            top = above >= pad ? above : Math.max(pad, limitBottom - menuH);
+        }
+
+        menu.style.left = `${Math.round(left)}px`;
+        menu.style.top = `${Math.round(top)}px`;
 
         menu.querySelectorAll(".msg-action-item").forEach((btn, idx) => {
             btn.addEventListener("click", () => {
@@ -1597,7 +1612,7 @@
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
             const menuBtnHtml = `
-                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all" style="color: var(--muted);" title="More">
+                <button type="button" class="btn-msg-menu absolute top-1/2 -translate-y-1/2 ${isMine ? "-left-9" : "-right-9"} flex h-7 w-7 items-center justify-center rounded-full opacity-50 hover:opacity-100 hover:bg-elevated2 transition-all z-10" style="color: var(--muted);" title="More">
                     <i data-lucide="more-vertical" class="w-4 h-4"></i>
                 </button>`;
 
@@ -1635,7 +1650,12 @@
                 btnMenu.addEventListener("click", (e) => {
                     e.stopPropagation();
                     const rect = btnMenu.getBoundingClientRect();
-                    openMessageActionMenu(msg, chat, isMine, rect.left, rect.bottom + 4);
+                    // Neo giữa nút 3 chấm — ổn định hơn trên mobile
+                    openMessageActionMenu(
+                        msg, chat, isMine,
+                        rect.left + rect.width / 2,
+                        rect.bottom + 6
+                    );
                 });
             }
 
@@ -1673,7 +1693,8 @@
                     pressTimer = setTimeout(() => {
                         pressable.classList.add("is-pressing");
                         if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
-                        openMessageActionMenu(msg, chat, isMine, touch.clientX, touch.clientY);
+                        // Dùng tọa độ đã lưu — tránh touch object bị reset trên mobile
+                        openMessageActionMenu(msg, chat, isMine, pressStartX, pressStartY);
                         clearPress();
                     }, 480);
                 }, { passive: true });
