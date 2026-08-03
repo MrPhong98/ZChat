@@ -1451,7 +1451,7 @@
         document.body.appendChild(menu);
         icons();
 
-        // Định vị menu trong khung nhìn, tránh đè lên text box (composer)
+        // Định vị menu trong khung nhìn, tránh đè lên text box
         const menuRect = menu.getBoundingClientRect();
         const vw = window.innerWidth;
         const vh = window.innerHeight;
