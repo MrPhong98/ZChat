@@ -459,17 +459,17 @@
                     <div class="flex items-center gap-2">
                         <button type="button" id="attachBtn" aria-label="Attach file"
                                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
-                                style="background-color: var(--elevated); color: var(--muted);">
+                                style="background-color: color-mix(in srgb, var(--elevated) 75%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--muted);">
                             <i data-lucide="plus" class="w-[19px] h-[19px]"></i>
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
                         <div class="flex flex-1 min-h-10 items-center gap-1.5 rounded-full pl-4 pr-1.5"
-                             style="background-color: var(--elevated);">
+                             style="background-color: color-mix(in srgb, var(--elevated) 75%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
                             <textarea
                                     id="messageInput"
                                     rows="1"
-                                    placeholder="Write a message..."
+                                    placeholder="Message"
                                     class="max-h-40 flex-1 resize-none bg-transparent py-2 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
                                     style="color: var(--ink);"
                             ></textarea>
