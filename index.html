@@ -427,7 +427,7 @@
                 <div id="messageFeed" class="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-4 py-5 pb-24 sm:px-8"></div>
 
                 <!-- Composer (nổi đè lên trên tin nhắn, không có nền riêng) -->
-                <div class="absolute bottom-0 left-0 right-0 px-4 py-3 sm:px-6">
+                <div class="absolute bottom-0 left-0 right-0 z-20 px-4 py-3 sm:px-6">
                     <div id="emojiPopover"
                          class="hidden absolute bottom-full right-4 mb-2 grid grid-cols-6 gap-1 rounded-2xl p-2 shadow-lg"
                          style="background-color: var(--elevated);"></div>
@@ -459,13 +459,13 @@
                     <div class="flex items-center gap-2">
                         <button type="button" id="attachBtn" aria-label="Attach file"
                                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
-                                style="background-color: color-mix(in srgb, var(--elevated2) 72%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--transparent-border); color: var(--muted);">
+                                style="background-color: color-mix(in srgb, var(--elevated) 75%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--muted);">
                             <i data-lucide="plus" class="w-[19px] h-[19px]"></i>
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
                         <div class="flex flex-1 min-h-10 items-center gap-1.5 rounded-full pl-4 pr-1.5"
-                             style="background-color: color-mix(in srgb, var(--elevated2) 72%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--transparent-border);">
+                             style="background-color: color-mix(in srgb, var(--elevated) 75%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
                             <textarea
                                     id="messageInput"
                                     rows="1"
