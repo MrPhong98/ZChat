@@ -1261,7 +1261,7 @@
         }
 
         if (sendIcon) {
-            sendIcon.setAttribute("data-lucide", "send-horizontal");
+            sendIcon.setAttribute("data-lucide", "arrow-up");
             icons();
         }
 
