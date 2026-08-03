@@ -751,9 +751,9 @@
         syncProfileData();
         applyLanguage();
         renderChatList();
-        
+
         loadMessagesFromSupabase();
-        
+
         renderActiveChat();
         icons();
     }
@@ -1123,13 +1123,32 @@
         renderActiveChat();
 
         loadMessagesForChat(chatId);
+        markChatAsRead(chatId);
+    }
+
+    // Đánh dấu các tin nhắn của người kia trong đoạn chat này là đã xem (cho tính năng "Seen")
+    async function markChatAsRead(chatId) {
+        if (!window.supabaseClient || !chatId || chatId.startsWith("saved_")) return;
+        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
+        if (!me) return;
+        try {
+            const { error } = await window.supabaseClient
+                .from("messages")
+                .update({ read_at: new Date().toISOString() })
+                .eq("chat_id", chatId)
+                .neq("sender_username", me)
+                .is("read_at", null);
+            if (error) console.error("[ZChat] markChatAsRead error:", error);
+        } catch (err) {
+            console.error("[ZChat] markChatAsRead exception:", err);
+        }
     }
 
     function statusIconMarkup(status) {
-        if (status === "sending") return `<i data-lucide="clock-3" class="w-[12px] h-[12px]" style="color: var(--faint);"></i>`;
-        if (status === "sent") return `<i data-lucide="check" class="w-[13px] h-[13px]" style="color: var(--faint);"></i>`;
-        if (status === "delivered") return `<i data-lucide="check-check" class="w-[13px] h-[13px]" style="color: var(--faint);"></i>`;
-        return `<i data-lucide="check-check" class="w-[13px] h-[13px]" style="color: var(--online);"></i>`;
+        if (status === "read") {
+            return `<span class="text-[11px] font-medium" style="color: var(--muted);">Seen</span>`;
+        }
+        return "";
     }
 
     function renderActiveChat() {
@@ -2108,7 +2127,7 @@
                         senderId: m.sender_username === me ? "me" : m.sender_username || "other",
                         text: m.content || "",
                         createdAt: new Date(m.created_at).getTime(),
-                        status: "read",
+                        status: m.read_at ? "read" : "delivered",
                     });
                 }
             });
@@ -2335,6 +2354,7 @@
                         if (state.activeChatId === chat.id) {
                             renderMessages(chat);
                             if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
+                            markChatAsRead(chat.id);
                         } else if (newMsg.sender_username !== me) {
                             chat.unread = (chat.unread || 0) + 1;
                         }
@@ -2365,8 +2385,15 @@
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        msg.text = updatedMsg.content || "";
-                        msg.isEdited = true;
+                        const contentChanged = (updatedMsg.content || "") !== msg.text;
+                        if (contentChanged) {
+                            msg.text = updatedMsg.content || "";
+                            msg.isEdited = true;
+                        }
+
+                        if (updatedMsg.read_at && msg.status !== "read") {
+                            msg.status = "read";
+                        }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
                         renderChatList();
