@@ -920,6 +920,39 @@
         savePinnedChatIds(ids);
         renderChatList();
     }
+
+    /* ============ CLEAR CONVERSATION (xoá toàn bộ tin nhắn trong 1 đoạn chat) ============ */
+    async function clearConversation(chatId) {
+        const chat = state.chats.find((c) => c.id === chatId);
+        if (!chat) return;
+
+        const lang = localStorage.getItem("zchat_lang") || "en";
+        const dict = i18n[lang] || i18n.en;
+
+        const confirmed = await customConfirm(
+            dict.confirmClearTitle || "Clear Conversation",
+            dict.confirmClear || "Are you sure you want to delete all messages in this conversation? This cannot be undone."
+        );
+        if (!confirmed) return;
+
+        chat.messages = [];
+        chat.unread = 0;
+
+        if (state.activeChatId === chat.id) renderMessages(chat);
+        renderChatList();
+
+        if (window.supabaseClient) {
+            try {
+                const { error } = await window.supabaseClient
+                    .from("messages")
+                    .delete()
+                    .eq("chat_id", chatId);
+                if (error) console.error("[ZChat] clearConversation error:", error);
+            } catch (err) {
+                console.error("[ZChat] clearConversation exception:", err);
+            }
+        }
+    }
     function closeChatListMenu() {
         const existing = document.getElementById("zchatChatListMenu");
         if (existing) existing.remove();
@@ -939,6 +972,10 @@
             <button type="button" class="msg-action-item" data-action="pin">
                 <i data-lucide="${pinned ? "pin-off" : "pin"}" class="msg-action-icon"></i>
                 <span>${pinned ? "Unpin conversation" : "Pin conversation"}</span>
+            </button>
+            <button type="button" class="msg-action-item danger" data-action="clear">
+                <i data-lucide="eraser" class="msg-action-icon"></i>
+                <span>Clear Conversation</span>
             </button>`;
         document.body.appendChild(menu);
         icons();
@@ -957,6 +994,11 @@
             e.stopPropagation();
             closeChatListMenu();
             togglePinChat(chat.id);
+        });
+        menu.querySelector('[data-action="clear"]').addEventListener("click", (e) => {
+            e.stopPropagation();
+            closeChatListMenu();
+            clearConversation(chat.id);
         });
         setTimeout(() => document.addEventListener("click", closeChatListMenuOnOutside, true), 0);
     }
@@ -1825,6 +1867,15 @@
             applyScreenshotProtection(chat.blockScreenshots);
         }
     });
+
+    const clearConversationBtn = document.getElementById("clearConversationBtn");
+    if (clearConversationBtn) {
+        clearConversationBtn.addEventListener("click", async () => {
+            if (!state.activeChatId) return;
+            await clearConversation(state.activeChatId);
+            closeInfoDrawer();
+        });
+    }
 
     function updateSendBtnState() {
         sendBtn.disabled = messageInput.value.trim().length === 0;
