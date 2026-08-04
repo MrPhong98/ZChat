@@ -1848,8 +1848,7 @@ function getVerifiedBadge(isVerified) {
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (preview) {
             preview.textContent = (!chat || chat.participant.name === "Saved Messages")
-                ? "Not available"
-                : "Tap to verify encryption";
+                ? "Not available" : "Tap to verify encryption";
         }
     }
     function closeInfoDrawer() {
@@ -1880,42 +1879,51 @@ function getVerifiedBadge(isVerified) {
         return html;
     }
 
-    /** Draw ZChat bubble logo in center of QR canvas */
-    function drawZChatLogoOnQr(canvas) {
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const size = canvas.width;
-        const logoBox = Math.round(size * 0.28);
-        const x = (size - logoBox) / 2;
-        const y = (size - logoBox) / 2;
-        const r = logoBox * 0.22;
+    /** Render QR onto canvas; fallback to img API. Logo is CSS overlay. */
+    async function renderSafetyQr(payload) {
+        const canvas = document.getElementById("safetyQrCanvas");
+        const img = document.getElementById("safetyQrImg");
+        const data = String(payload || "").replace(/\s+/g, "");
+        if (!data) return;
 
-        // white/dark plate so QR quiet-zone is readable
-        ctx.fillStyle = "#0a0a0a";
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + logoBox, y, x + logoBox, y + logoBox, r);
-        ctx.arcTo(x + logoBox, y + logoBox, x, y + logoBox, r);
-        ctx.arcTo(x, y + logoBox, x, y, r);
-        ctx.arcTo(x, y, x + logoBox, y, r);
-        ctx.closePath();
-        ctx.fill();
+        // reset
+        if (canvas) {
+            canvas.classList.remove("hidden");
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#0a0a0a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        if (img) {
+            img.classList.add("hidden");
+            img.removeAttribute("src");
+        }
 
-        // ZChat bubble path (viewBox 0 0 100 100) scaled into logoBox
-        const pad = logoBox * 0.18;
-        const s = (logoBox - pad * 2) / 100;
-        ctx.save();
-        ctx.translate(x + pad, y + pad);
-        ctx.scale(s, s);
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 7;
-        ctx.lineJoin = "round";
-        const p = new Path2D(
-            "M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
-        );
-        ctx.fill(p);
-        ctx.restore();
+        let ok = false;
+        if (canvas && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
+            try {
+                await QRCode.toCanvas(canvas, data, {
+                    width: 200,
+                    margin: 2,
+                    errorCorrectionLevel: "H",
+                    color: { dark: "#ffffff", light: "#0a0a0a" },
+                });
+                ok = true;
+            } catch (e) {
+                console.warn("[E2EE] QRCode.toCanvas failed:", e);
+            }
+        }
+
+        // Fallback: public QR API image
+        if (!ok && img) {
+            const url = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&color=ffffff&bgcolor=0a0a0a&data="
+                + encodeURIComponent(data);
+            img.onload = () => {
+                img.classList.remove("hidden");
+                if (canvas) canvas.classList.add("hidden");
+            };
+            img.onerror = () => console.warn("[E2EE] QR img fallback failed");
+            img.src = url;
+        }
     }
 
     async function openSafetyNumberModal() {
@@ -1926,14 +1934,15 @@ function getVerifiedBadge(isVerified) {
         const grid = document.getElementById("safetyNumberGrid");
         const hint = document.getElementById("safetyNumberHint");
         const errEl = document.getElementById("safetyNumberError");
-        const canvas = document.getElementById("safetyQrCanvas");
 
         safetyNumberModal.classList.remove("hidden");
         if (errEl) { errEl.classList.add("hidden"); errEl.textContent = ""; }
         if (grid) grid.textContent = "…";
         if (hint) {
-            hint.textContent = `To verify end-to-end encryption with ${chat.participant.name}, compare numbers above with their device.`;
+            hint.textContent = "To verify end-to-end encryption with "
+                + chat.participant.name + ", compare numbers above with their device.";
         }
+        // Always allow Verify press
         if (safetyMarkVerifiedBtn) {
             safetyMarkVerifiedBtn.disabled = false;
             safetyMarkVerifiedBtn.textContent = "Mark as verified";
@@ -1979,27 +1988,13 @@ function getVerifiedBadge(isVerified) {
 
             const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
             if (grid) grid.innerHTML = formatSafetyGrid(num);
+            await renderSafetyQr(num);
 
-            if (canvas && typeof QRCode !== "undefined" && num) {
-                try {
-                    await QRCode.toCanvas(canvas, num.replace(/\s+/g, ""), {
-                        width: 200,
-                        margin: 2,
-                        errorCorrectionLevel: "H", // high — allows center logo
-                        color: { dark: "#ffffff", light: "#0a0a0a" },
-                    });
-                    drawZChatLogoOnQr(canvas);
-                } catch (qrErr) {
-                    console.warn("[E2EE] QR render:", qrErr);
-                }
-            }
-
+            // Soft hint if already verified — button stays clickable
             if (partnerId) {
                 const already = await window.ZChatE2EE.hasVerifiedUser(partnerId);
                 if (already && safetyMarkVerifiedBtn) {
-                    safetyMarkVerifiedBtn.textContent = "Verified";
-                    safetyMarkVerifiedBtn.disabled = true;
-                    safetyMarkVerifiedBtn.style.opacity = "0.55";
+                    safetyMarkVerifiedBtn.textContent = "Verified ✓";
                 }
             }
         } catch (err) {
@@ -2022,9 +2017,7 @@ function getVerifiedBadge(isVerified) {
             openSafetyNumberModal();
         });
     }
-    if (closeSafetyNumberBtn) {
-        closeSafetyNumberBtn.addEventListener("click", closeSafetyNumberModal);
-    }
+    if (closeSafetyNumberBtn) closeSafetyNumberBtn.addEventListener("click", closeSafetyNumberModal);
     if (safetyNumberModal) {
         safetyNumberModal.addEventListener("click", (e) => {
             if (e.target === safetyNumberModal) closeSafetyNumberModal();
@@ -2032,24 +2025,33 @@ function getVerifiedBadge(isVerified) {
     }
     if (safetyMarkVerifiedBtn) {
         safetyMarkVerifiedBtn.addEventListener("click", async () => {
-            if (!window.ZChatE2EE || !_safetyPartnerId) {
-                if (!_safetyPartnerId) {
-                    safetyMarkVerifiedBtn.textContent = "No user id";
-                    setTimeout(() => { safetyMarkVerifiedBtn.textContent = "Mark as verified"; }, 1500);
+            if (!window.ZChatE2EE) return;
+            if (!_safetyPartnerId) {
+                // try resolve id once more
+                const chat = state.chats.find((c) => c.id === state.activeChatId);
+                if (chat) {
+                    const row = await window.ZChatE2EE.fetchPublicKeyForUsername(chat.participant.name);
+                    if (row) {
+                        _safetyPartnerId = row.id;
+                        chat.participant.userId = row.id;
+                    }
                 }
+            }
+            if (!_safetyPartnerId) {
+                const prev = safetyMarkVerifiedBtn.textContent;
+                safetyMarkVerifiedBtn.textContent = "No user id";
+                setTimeout(() => { safetyMarkVerifiedBtn.textContent = prev; }, 1500);
                 return;
             }
-            safetyMarkVerifiedBtn.disabled = true;
+            const prevLabel = safetyMarkVerifiedBtn.textContent;
             safetyMarkVerifiedBtn.textContent = "…";
             try {
                 await window.ZChatE2EE.markUserAsVerified(_safetyPartnerId);
-                safetyMarkVerifiedBtn.textContent = "Verified";
-                safetyMarkVerifiedBtn.style.opacity = "0.55";
+                safetyMarkVerifiedBtn.textContent = "Verified ✓";
             } catch (err) {
                 console.error("[E2EE] mark verified:", err);
                 safetyMarkVerifiedBtn.textContent = "Failed";
-                safetyMarkVerifiedBtn.disabled = false;
-                setTimeout(() => { safetyMarkVerifiedBtn.textContent = "Mark as verified"; }, 1500);
+                setTimeout(() => { safetyMarkVerifiedBtn.textContent = prevLabel; }, 1500);
             }
         });
     }

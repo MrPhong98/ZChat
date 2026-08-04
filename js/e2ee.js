@@ -1,6 +1,5 @@
 /**
  * ZChat E2EE — RSA-OAEP 2048 + AES-GCM (hybrid)
- * Decrypt: cached CryptoKey + parallel batch
  */
 (function (global) {
     "use strict";
@@ -14,10 +13,8 @@
     const AES_ALGO = { name: "AES-GCM", length: 256 };
     const E2EE_VERSION = 1;
 
-    let _cachedPrivJwk = null;
-    let _cachedPrivKey = null;
-    let _cachedPubJwk = null;
-    let _cachedPubKey = null;
+    let _cachedPrivJwk = null, _cachedPrivKey = null;
+    let _cachedPubJwk = null, _cachedPubKey = null;
 
     function bufToB64(buf) {
         const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
@@ -25,87 +22,61 @@
         for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
         return btoa(s);
     }
-
     function b64ToBuf(b64) {
         const s = atob(b64);
         const bytes = new Uint8Array(s.length);
         for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
         return bytes.buffer;
     }
-
     function jwkToString(jwk) {
         return typeof jwk === "string" ? jwk : JSON.stringify(jwk);
     }
-
     function parseJwk(jwk) {
         if (!jwk) return null;
         if (typeof jwk === "object") return jwk;
-        try {
-            return JSON.parse(jwk);
-        } catch {
-            return null;
-        }
+        try { return JSON.parse(jwk); } catch { return null; }
     }
-
     function canonicalJwkString(jwk) {
         const o = parseJwk(jwk);
         if (!o) return "";
-        const keys = ["e", "kty", "n"].filter((k) => o[k] != null);
+        const keys = ["e", "kty", "n"].filter((k) => o[k] != null).sort();
         const sorted = {};
-        keys.sort().forEach((k) => {
-            sorted[k] = o[k];
-        });
+        keys.forEach((k) => { sorted[k] = o[k]; });
         return JSON.stringify(sorted);
     }
 
     async function generateKeyPairJwk() {
         const keyPair = await crypto.subtle.generateKey(RSA_ALGO, true, ["encrypt", "decrypt"]);
-        const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
-        const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
         return {
-            publicKey: JSON.stringify(publicJwk),
-            privateKey: JSON.stringify(privateJwk),
+            publicKey: JSON.stringify(await crypto.subtle.exportKey("jwk", keyPair.publicKey)),
+            privateKey: JSON.stringify(await crypto.subtle.exportKey("jwk", keyPair.privateKey)),
         };
     }
-
     async function importPublicKey(jwk) {
         const str = jwkToString(jwk);
         if (_cachedPubJwk === str && _cachedPubKey) return _cachedPubKey;
         const obj = parseJwk(jwk);
         if (!obj) throw new Error("Invalid public key JWK");
         const key = await crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["encrypt"]);
-        _cachedPubJwk = str;
-        _cachedPubKey = key;
+        _cachedPubJwk = str; _cachedPubKey = key;
         return key;
     }
-
     async function importPrivateKey(jwk) {
         const str = jwkToString(jwk);
         if (_cachedPrivJwk === str && _cachedPrivKey) return _cachedPrivKey;
         const obj = parseJwk(jwk);
         if (!obj) throw new Error("Invalid private key JWK");
         const key = await crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["decrypt"]);
-        _cachedPrivJwk = str;
-        _cachedPrivKey = key;
+        _cachedPrivJwk = str; _cachedPrivKey = key;
         return key;
     }
-
     function cacheKeysLocally(publicKey, privateKey) {
         if (publicKey) localStorage.setItem("zchat_public_key", jwkToString(publicKey));
         if (privateKey) localStorage.setItem("zchat_private_key", jwkToString(privateKey));
-        _cachedPrivJwk = null;
-        _cachedPrivKey = null;
-        _cachedPubJwk = null;
-        _cachedPubKey = null;
+        _cachedPrivJwk = _cachedPrivKey = _cachedPubJwk = _cachedPubKey = null;
     }
-
-    function getLocalPrivateKey() {
-        return localStorage.getItem("zchat_private_key") || "";
-    }
-
-    function getLocalPublicKey() {
-        return localStorage.getItem("zchat_public_key") || "";
-    }
+    function getLocalPrivateKey() { return localStorage.getItem("zchat_private_key") || ""; }
+    function getLocalPublicKey() { return localStorage.getItem("zchat_public_key") || ""; }
 
     async function ensureUserKeys(username, existingUserRow) {
         if (!global.supabaseClient || !username) {
@@ -114,10 +85,8 @@
         let row = existingUserRow;
         if (!row) {
             const { data } = await global.supabaseClient
-                .from("users")
-                .select("username, public_key, private_key, id")
-                .ilike("username", username)
-                .maybeSingle();
+                .from("users").select("username, public_key, private_key, id")
+                .ilike("username", username).maybeSingle();
             row = data;
         }
         if (row && row.public_key && row.private_key) {
@@ -126,10 +95,9 @@
         }
         const pair = await generateKeyPairJwk();
         const { error } = await global.supabaseClient
-            .from("users")
-            .update({ public_key: pair.publicKey, private_key: pair.privateKey })
+            .from("users").update({ public_key: pair.publicKey, private_key: pair.privateKey })
             .ilike("username", username);
-        if (error) console.error("[E2EE] Failed to save keys:", error);
+        if (error) console.error("[E2EE] save keys:", error);
         cacheKeysLocally(pair.publicKey, pair.privateKey);
         return { publicKey: pair.publicKey, privateKey: pair.privateKey, userId: row && row.id };
     }
@@ -137,10 +105,8 @@
     async function fetchPublicKeyForUsername(username) {
         if (!global.supabaseClient || !username) return null;
         const { data, error } = await global.supabaseClient
-            .from("users")
-            .select("username, public_key, id")
-            .ilike("username", username)
-            .maybeSingle();
+            .from("users").select("username, public_key, id")
+            .ilike("username", username).maybeSingle();
         if (error || !data || !data.public_key) return null;
         return data;
     }
@@ -157,23 +123,14 @@
         const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const cipherBuf = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv },
-            aesKey,
-            new TextEncoder().encode(String(plainText))
+            { name: "AES-GCM", iv }, aesKey, new TextEncoder().encode(String(plainText))
         );
         const rawAes = await crypto.subtle.exportKey("raw", aesKey);
         const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
-        return bufToB64(
-            new TextEncoder().encode(
-                JSON.stringify({
-                    v: E2EE_VERSION,
-                    alg: "RSA-OAEP+AES-GCM",
-                    iv: bufToB64(iv),
-                    c: bufToB64(cipherBuf),
-                    k: bufToB64(wrapped),
-                })
-            )
-        );
+        return bufToB64(new TextEncoder().encode(JSON.stringify({
+            v: E2EE_VERSION, alg: "RSA-OAEP+AES-GCM",
+            iv: bufToB64(iv), c: bufToB64(cipherBuf), k: bufToB64(wrapped),
+        })));
     }
 
     async function encryptMessageForUsers(plainText, publicKeysByUsername) {
@@ -183,56 +140,39 @@
         const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const cipherBuf = await crypto.subtle.encrypt(
-            { name: "AES-GCM", iv },
-            aesKey,
-            new TextEncoder().encode(String(plainText))
+            { name: "AES-GCM", iv }, aesKey, new TextEncoder().encode(String(plainText))
         );
         const rawAes = await crypto.subtle.exportKey("raw", aesKey);
         const keys = {};
-        await Promise.all(
-            entries.map(async ([name, jwk]) => {
-                const pubKey = await importPublicKey(jwk);
-                const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
-                keys[name.toLowerCase()] = bufToB64(wrapped);
-            })
-        );
-        return bufToB64(
-            new TextEncoder().encode(
-                JSON.stringify({
-                    v: E2EE_VERSION,
-                    alg: "RSA-OAEP+AES-GCM",
-                    iv: bufToB64(iv),
-                    c: bufToB64(cipherBuf),
-                    keys,
-                })
-            )
-        );
+        await Promise.all(entries.map(async ([name, jwk]) => {
+            const pubKey = await importPublicKey(jwk);
+            const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
+            keys[name.toLowerCase()] = bufToB64(wrapped);
+        }));
+        return bufToB64(new TextEncoder().encode(JSON.stringify({
+            v: E2EE_VERSION, alg: "RSA-OAEP+AES-GCM",
+            iv: bufToB64(iv), c: bufToB64(cipherBuf), keys,
+        })));
     }
 
     async function decryptMessage(encryptedBase64, myPrivateKeyJwk) {
-        if (!encryptedBase64) return "";
-        if (!myPrivateKeyJwk) return null;
+        if (!encryptedBase64 || !myPrivateKeyJwk) return null;
         try {
             if (!looksLikeE2eePayload(encryptedBase64)) return null;
             const payload = JSON.parse(new TextDecoder().decode(b64ToBuf(encryptedBase64)));
             if (!payload || !payload.c || !payload.iv) return null;
             const privKey = await importPrivateKey(myPrivateKeyJwk);
             let wrappedB64 = payload.k || null;
-            if (!wrappedB64 && payload.keys && typeof payload.keys === "object") {
+            if (!wrappedB64 && payload.keys) {
                 const me = (localStorage.getItem("zchat_username") || "").toLowerCase();
                 wrappedB64 = payload.keys[me] || Object.values(payload.keys).find(Boolean) || null;
             }
             if (!wrappedB64) return null;
-            const rawAes = await crypto.subtle.decrypt(
-                { name: "RSA-OAEP" },
-                privKey,
-                b64ToBuf(wrappedB64)
-            );
+            const rawAes = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, privKey, b64ToBuf(wrappedB64));
             const aesKey = await crypto.subtle.importKey("raw", rawAes, AES_ALGO, false, ["decrypt"]);
             const plainBuf = await crypto.subtle.decrypt(
                 { name: "AES-GCM", iv: new Uint8Array(b64ToBuf(payload.iv)) },
-                aesKey,
-                b64ToBuf(payload.c)
+                aesKey, b64ToBuf(payload.c)
             );
             return new TextDecoder().decode(plainBuf);
         } catch (err) {
@@ -247,26 +187,19 @@
         try {
             const plain = await decryptMessage(content, privateKeyJwk);
             return plain != null ? plain : content;
-        } catch {
-            return content;
-        }
+        } catch { return content; }
     }
 
     async function decryptMessagesBatch(messages, privateKeyJwk) {
         if (!messages || !messages.length || !privateKeyJwk) return;
-        try {
-            await importPrivateKey(privateKeyJwk);
-        } catch {
-            return;
-        }
+        try { await importPrivateKey(privateKeyJwk); } catch { return; }
         const tasks = messages.map(async (msg) => {
             if (!msg || !msg.text || !looksLikeE2eePayload(msg.text)) return;
             const plain = await safeDecryptContent(msg.text, privateKeyJwk);
             if (plain != null) msg.text = plain;
         });
-        const CHUNK = 32;
-        for (let i = 0; i < tasks.length; i += CHUNK) {
-            await Promise.all(tasks.slice(i, i + CHUNK));
+        for (let i = 0; i < tasks.length; i += 32) {
+            await Promise.all(tasks.slice(i, i + 32));
         }
     }
 
@@ -277,8 +210,7 @@
             if (!a || !b) return "";
             const [first, second] = [a, b].sort();
             const hashBuf = await crypto.subtle.digest(
-                "SHA-256",
-                new TextEncoder().encode(first + "|" + second)
+                "SHA-256", new TextEncoder().encode(first + "|" + second)
             );
             const bytes = new Uint8Array(hashBuf);
             let digits = "";
@@ -286,8 +218,7 @@
                 digits += String(bytes[i] % 10);
                 digits += String(Math.floor(bytes[i] / 10) % 10);
             }
-            digits = digits.slice(0, 60);
-            return (digits.match(/.{1,5}/g) || []).join(" ");
+            return (digits.slice(0, 60).match(/.{1,5}/g) || []).join(" ");
         } catch (err) {
             console.error("[E2EE] generateSafetyNumber:", err);
             return "";
@@ -300,21 +231,16 @@
         const me = myUsername || localStorage.getItem("zchat_username") || "";
         if (!me) throw new Error("Not logged in");
         const { data: meRow, error: fetchErr } = await global.supabaseClient
-            .from("users")
-            .select("id, username, verified_users")
-            .ilike("username", me)
-            .maybeSingle();
+            .from("users").select("id, username, verified_users")
+            .ilike("username", me).maybeSingle();
         if (fetchErr) throw fetchErr;
         if (!meRow) throw new Error("Current user not found");
         const current = Array.isArray(meRow.verified_users) ? meRow.verified_users.slice() : [];
         const tid = String(targetUserId);
         if (!current.includes(tid)) current.push(tid);
         const { data, error } = await global.supabaseClient
-            .from("users")
-            .update({ verified_users: current })
-            .ilike("username", me)
-            .select("verified_users")
-            .maybeSingle();
+            .from("users").update({ verified_users: current })
+            .ilike("username", me).select("verified_users").maybeSingle();
         if (error) throw error;
         return data && data.verified_users ? data.verified_users : current;
     }
@@ -324,30 +250,16 @@
         const me = myUsername || localStorage.getItem("zchat_username") || "";
         if (!me) return false;
         const { data } = await global.supabaseClient
-            .from("users")
-            .select("verified_users")
-            .ilike("username", me)
-            .maybeSingle();
-        const list = (data && data.verified_users) || [];
-        return list.map(String).includes(String(targetUserId));
+            .from("users").select("verified_users")
+            .ilike("username", me).maybeSingle();
+        return ((data && data.verified_users) || []).map(String).includes(String(targetUserId));
     }
 
     global.ZChatE2EE = {
-        generateKeyPairJwk,
-        ensureUserKeys,
-        fetchPublicKeyForUsername,
-        encryptMessage,
-        encryptMessageForUsers,
-        decryptMessage,
-        safeDecryptContent,
-        decryptMessagesBatch,
-        generateSafetyNumber,
-        markUserAsVerified,
-        hasVerifiedUser,
-        getLocalPrivateKey,
-        getLocalPublicKey,
-        cacheKeysLocally,
-        looksLikeE2eePayload,
+        generateKeyPairJwk, ensureUserKeys, fetchPublicKeyForUsername,
+        encryptMessage, encryptMessageForUsers, decryptMessage, safeDecryptContent,
+        decryptMessagesBatch, generateSafetyNumber, markUserAsVerified, hasVerifiedUser,
+        getLocalPrivateKey, getLocalPublicKey, cacheKeysLocally, looksLikeE2eePayload,
     };
     console.log("[E2EE] ZChatE2EE ready");
 })(typeof window !== "undefined" ? window : globalThis);
