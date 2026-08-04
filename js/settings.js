@@ -151,14 +151,39 @@
         const avatarType = localStorage.getItem("zchat_avatar_type") || "initials";
         const avatarColor = localStorage.getItem("zchat_avatar_color") || colorFor(username);
         const avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || "😀";
+        const avatarUrl = localStorage.getItem("zchat_avatar_url") || "";
 
-        if (avatarType === "emoji") {
+        if (avatarType === "photo" && avatarUrl) {
+            profileAvatar.style.backgroundColor = "var(--elevated2)";
+            profileAvatar.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="h-full w-full rounded-full object-cover" />`;
+        } else if (avatarType === "emoji") {
             profileAvatar.style.backgroundColor = "var(--elevated2)";
             profileAvatar.textContent = avatarEmoji;
         } else {
             profileAvatar.style.backgroundColor = avatarColor;
             profileAvatar.style.color = "var(--avatar-text)";
             profileAvatar.textContent = initials(username);
+        }
+    }
+
+    /** Avatar theo tài khoản — lấy từ Supabase khi mở Settings */
+    async function syncAvatarFromAccount() {
+        const username = (localStorage.getItem("zchat_username") || "").trim();
+        if (!username || !window.supabaseClient || !profileAvatar) return;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .ilike("username", username)
+                .maybeSingle();
+            if (error || !data) return;
+            if (data.avatar_type) localStorage.setItem("zchat_avatar_type", data.avatar_type);
+            if (data.avatar_color) localStorage.setItem("zchat_avatar_color", data.avatar_color);
+            if (data.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", data.avatar_emoji);
+            if (data.avatar_url) localStorage.setItem("zchat_avatar_url", data.avatar_url);
+            loadProfileData();
+        } catch (err) {
+            console.error("[ZChat] settings syncAvatarFromAccount error:", err);
         }
     }
 
@@ -306,5 +331,6 @@
 
     loadSettings();
     loadProfileData();
+    syncAvatarFromAccount();
     if (window.lucide) window.lucide.createIcons();
 })();

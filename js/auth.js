@@ -17,20 +17,17 @@ function clearLocalAvatar() {
     ].forEach((k) => localStorage.removeItem(k));
 }
 
-/** Lưu session đồng bộ cho index / settings / profile */
+/** Lưu session đồng bộ cho index / settings / profile — avatar lấy theo tài khoản trên server */
 function saveSession(user, opts) {
     if (!user || !user.username) return;
     const isNewRegister = opts && opts.isNewRegister;
-    if (isNewRegister) {
-        clearLocalAvatar();
-    } else if (user.avatar_type || user.avatar_url || user.avatar_emoji || user.avatar_color) {
-        clearLocalAvatar();
+    clearLocalAvatar();
+    if (!isNewRegister) {
+        // Đồng bộ avatar từ tài khoản (login trên PC / điện thoại / trình duyệt khác)
         if (user.avatar_type) localStorage.setItem("zchat_avatar_type", user.avatar_type);
         if (user.avatar_color) localStorage.setItem("zchat_avatar_color", user.avatar_color);
         if (user.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", user.avatar_emoji);
         if (user.avatar_url) localStorage.setItem("zchat_avatar_url", user.avatar_url);
-    } else {
-        clearLocalAvatar();
     }
     localStorage.setItem("zchat_username", user.username);
     if (user.recovery_password) {

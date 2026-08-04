@@ -184,13 +184,13 @@
     }
 
     /* ============ GUARD: no account yet ============ */
-    let savedUsername = localStorage.getItem("zchat_username");
+    const savedUsername = localStorage.getItem("zchat_username");
     if (!savedUsername) {
         window.location.href = "index.html";
         return;
     }
 
-    /* ============ LOAD SAVED STATE ============ */
+    /* ============ LOAD SAVED STATE (local trước, rồi đồng bộ từ tài khoản Supabase) ============ */
     const saved = {
         username: savedUsername,
         bio: localStorage.getItem("zchat_bio") || "Available",
@@ -203,6 +203,39 @@
     };
 
     const draft = Object.assign({}, saved);
+
+    /** Avatar gắn với tài khoản — fetch từ server để đồng bộ mọi thiết bị */
+    async function loadAvatarFromAccount() {
+        if (!window.supabaseClient || !savedUsername) return;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .ilike("username", savedUsername)
+                .maybeSingle();
+            if (error || !data) return;
+
+            if (data.avatar_type) {
+                draft.avatarType = saved.avatarType = data.avatar_type;
+                localStorage.setItem("zchat_avatar_type", data.avatar_type);
+            }
+            if (data.avatar_color) {
+                draft.avatarColor = saved.avatarColor = data.avatar_color;
+                localStorage.setItem("zchat_avatar_color", data.avatar_color);
+            }
+            if (data.avatar_emoji) {
+                draft.avatarEmoji = saved.avatarEmoji = data.avatar_emoji;
+                localStorage.setItem("zchat_avatar_emoji", data.avatar_emoji);
+            }
+            if (data.avatar_url) {
+                draft.avatarUrl = saved.avatarUrl = data.avatar_url;
+                localStorage.setItem("zchat_avatar_url", data.avatar_url);
+            }
+            if (typeof renderAvatarPreview === "function") renderAvatarPreview();
+        } catch (err) {
+            console.error("[ZChat] loadAvatarFromAccount error:", err);
+        }
+    }
 
     /* ============ DOM REFS ============ */
     const usernameField = document.getElementById("usernameField");
@@ -493,120 +526,49 @@
         localStorage.setItem("zchat_avatar_url", draft.avatarUrl || "");
         localStorage.setItem("zchat_theme", draft.theme);
 
-        // Đồng bộ avatar (+ username nếu đổi) lên Supabase
+        // Lưu avatar vào tài khoản trên Supabase (đồng bộ PC / điện thoại / trình duyệt)
         if (window.supabaseClient) {
             try {
-                const oldName = savedUsername;
-                const nameChanged = name.toLowerCase() !== String(oldName || "").toLowerCase();
-
-                if (nameChanged) {
-                    const { data: taken } = await window.supabaseClient
-                        .from("users")
-                        .select("username")
-                        .ilike("username", name)
-                        .maybeSingle();
-                    if (taken && taken.username && taken.username.toLowerCase() !== String(oldName).toLowerCase()) {
-                        usernameError.textContent = "Username already taken.";
-                        usernameError.classList.remove("hidden");
-                        localStorage.setItem("zchat_username", oldName);
-                        return;
-                    }
+                // Bỏ cache-bust ?t= khi lưu URL gốc
+                let avatarUrlToSave = draft.avatarUrl || null;
+                if (avatarUrlToSave && avatarUrlToSave.includes("?")) {
+                    avatarUrlToSave = avatarUrlToSave.split("?")[0];
                 }
-
-                const updatePayload = {
-                    avatar_type: draft.avatarType,
-                    avatar_color: draft.avatarColor || null,
-                    avatar_emoji: draft.avatarEmoji || null,
-                    avatar_url: draft.avatarUrl || null,
-                };
-                // Chỉ ghi username khi thực sự đổi tên
-                if (nameChanged) updatePayload.username = name;
-
+                const accountKey = savedUsername || name;
                 const { data: updatedRows, error } = await window.supabaseClient
                     .from("users")
-                    .update(updatePayload)
-                    .ilike("username", oldName)
+                    .update({
+                        avatar_type: draft.avatarType,
+                        avatar_color: draft.avatarColor || null,
+                        avatar_emoji: draft.avatarEmoji || null,
+                        avatar_url: avatarUrlToSave,
+                    })
+                    .ilike("username", accountKey)
                     .select("username");
 
                 if (error) {
-                    console.error("[ZChat] Sync profile to Supabase error:", error);
-                    if (error.code === "23505" || String(error.message || "").toLowerCase().includes("unique")) {
-                        usernameError.textContent = "Username already taken.";
-                        usernameError.classList.remove("hidden");
-                        localStorage.setItem("zchat_username", oldName);
-                        return;
-                    }
+                    console.error("[ZChat] Sync avatar to Supabase error:", error);
                 } else if (!updatedRows || updatedRows.length === 0) {
-                    console.warn(`[ZChat] Sync profile: không khớp username="${oldName}" trong bảng users.`);
+                    console.warn(`[ZChat] Sync avatar: không khớp username="${accountKey}" trong bảng users.`);
                 } else {
-                    console.log("[ZChat] Sync profile OK:", updatedRows);
-                }
-
-                // Đổi tên trên tin nhắn + chat_id để sau reload user B vẫn thấy tên mới
-                if (nameChanged && !error) {
-                    try {
-                        await window.supabaseClient
-                            .from("messages")
-                            .update({ sender_username: name })
-                            .ilike("sender_username", oldName);
-                    } catch (e1) {
-                        console.warn("[ZChat] Migrate sender_username:", e1);
+                    console.log("[ZChat] Avatar saved to account:", updatedRows);
+                    if (avatarUrlToSave) {
+                        draft.avatarUrl = avatarUrlToSave;
+                        localStorage.setItem("zchat_avatar_url", avatarUrlToSave);
                     }
-
-                    try {
-                        const oldL = oldName.toLowerCase();
-                        const newL = name.toLowerCase();
-                        const { data: msgRows } = await window.supabaseClient
-                            .from("messages")
-                            .select("id, chat_id")
-                            .ilike("chat_id", "%" + oldName + "%");
-
-                        if (msgRows && msgRows.length) {
-                            for (const m of msgRows) {
-                                const cid = String(m.chat_id || "");
-                                if (!cid.startsWith("chat_")) continue;
-                                const rest = cid.slice(5);
-                                const parts = rest.split("_");
-                                if (parts.length < 2) continue;
-                                // chat_id = chat_userA_userB (đã sort)
-                                const users = [parts[0], parts.slice(1).join("_")].map((u) =>
-                                    u.toLowerCase() === oldL ? newL : u.toLowerCase()
-                                );
-                                users.sort();
-                                const newChatId = "chat_" + users[0] + "_" + users[1];
-                                if (newChatId !== cid) {
-                                    await window.supabaseClient
-                                        .from("messages")
-                                        .update({ chat_id: newChatId })
-                                        .eq("id", m.id);
-                                }
-                            }
-                        }
-                    } catch (e2) {
-                        console.warn("[ZChat] Migrate chat_id:", e2);
-                    }
-
-                    try {
-                        const u = JSON.parse(localStorage.getItem("zchat_user") || "{}");
-                        if (u && typeof u === "object") {
-                            u.username = name;
-                            localStorage.setItem("zchat_user", JSON.stringify(u));
-                        }
-                    } catch (_) {}
                 }
             } catch (err) {
-                console.error("[ZChat] Sync profile to Supabase exception:", err);
+                console.error("[ZChat] Sync avatar to Supabase exception:", err);
             }
         }
 
         saved.username = name;
-        savedUsername = name;
-        draft.username = name;
-
         const lang = localStorage.getItem("zchat_lang") || "en";
         const dict = i18n[lang] || i18n.en;
         showToast(dict.successToast);
     });
 
     icons();
+    // Đồng bộ avatar từ tài khoản (sau khi DOM/render sẵn sàng)
+    loadAvatarFromAccount();
 })();

@@ -677,10 +677,7 @@
         icons();
     }
 
-    function syncProfileData() {
-        const savedTheme = localStorage.getItem("zchat_theme") || "dark";
-        document.documentElement.setAttribute("data-theme", savedTheme);
-
+    function applyLocalAvatarToUI() {
         const avatarType = localStorage.getItem("zchat_avatar_type") || "initials";
         const avatarColor = localStorage.getItem("zchat_avatar_color") || colorFor(currentUsername);
         const avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || "😀";
@@ -702,6 +699,43 @@
                 el.textContent = initials(currentUsername);
             }
         });
+    }
+
+    function syncProfileData() {
+        const savedTheme = localStorage.getItem("zchat_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", savedTheme);
+        applyLocalAvatarToUI();
+    }
+
+    /** Lấy avatar từ tài khoản trên Supabase → localStorage (đồng bộ PC / điện thoại / trình duyệt) */
+    async function syncMyAvatarFromServer(username) {
+        const me = (username || currentUsername || localStorage.getItem("zchat_username") || "").trim();
+        if (!me || !window.supabaseClient) return;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, recovery_password")
+                .ilike("username", me)
+                .maybeSingle();
+            if (error || !data) return;
+
+            if (data.avatar_type || data.avatar_url || data.avatar_emoji || data.avatar_color) {
+                if (data.avatar_type) localStorage.setItem("zchat_avatar_type", data.avatar_type);
+                else localStorage.removeItem("zchat_avatar_type");
+                if (data.avatar_color) localStorage.setItem("zchat_avatar_color", data.avatar_color);
+                else localStorage.removeItem("zchat_avatar_color");
+                if (data.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", data.avatar_emoji);
+                else localStorage.removeItem("zchat_avatar_emoji");
+                if (data.avatar_url) localStorage.setItem("zchat_avatar_url", data.avatar_url);
+                else localStorage.removeItem("zchat_avatar_url");
+            }
+            if (data.recovery_password) {
+                localStorage.setItem("zchat_recovery_password", data.recovery_password);
+            }
+            applyLocalAvatarToUI();
+        } catch (err) {
+            console.error("[ZChat] syncMyAvatarFromServer error:", err);
+        }
     }
 
     function generateRecoveryPassword() {
@@ -749,6 +783,8 @@
         }
 
         syncProfileData();
+        // Đồng bộ avatar từ tài khoản (Supabase) — mọi thiết bị / trình duyệt cùng 1 ảnh
+        syncMyAvatarFromServer(username);
         applyLanguage();
         renderChatList();
 
