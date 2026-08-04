@@ -207,14 +207,10 @@
         const display = document.getElementById("settingsRecoveryDisplay");
         if (!display) return;
         let recovery = localStorage.getItem("zchat_recovery_password") || "";
-        if (!recovery) {
-            try {
-                const zu = JSON.parse(localStorage.getItem("zchat_user") || "null");
-                if (zu && zu.recovery_password) {
-                    recovery = zu.recovery_password;
-                    localStorage.setItem("zchat_recovery_password", recovery);
-                }
-            } catch (_) {}
+        // Auto-generate for accounts created before this feature
+        if (!recovery && localStorage.getItem("zchat_username")) {
+            recovery = generateRecoveryPassword();
+            localStorage.setItem("zchat_recovery_password", recovery);
         }
         display.textContent = recovery || dict.noRecovery;
     }
@@ -294,9 +290,16 @@
     const logoutBtn = document.getElementById("logoutBtn");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", () => {
-            // End session — keep recovery password so user can log in again
-            localStorage.removeItem("zchat_username");
-            localStorage.removeItem("zchat_user");
+            // Clear session + avatar (tránh dính avatar user cũ sang account mới)
+            [
+                "zchat_username",
+                "zchat_user",
+                "zchat_recovery_password",
+                "zchat_avatar_type",
+                "zchat_avatar_color",
+                "zchat_avatar_emoji",
+                "zchat_avatar_url",
+            ].forEach((k) => localStorage.removeItem(k));
             window.location.href = "index.html";
         });
     }
