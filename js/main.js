@@ -776,6 +776,10 @@ function getVerifiedBadge(isVerified) {
     }
 
     function enterApp(username) {
+        if (window.ZChatE2EE && username) {
+            window.ZChatE2EE.ensureUserKeys(username).catch((e) => console.error("[E2EE] enterApp:", e));
+        }
+
         currentUsername = username;
         localStorage.setItem("zchat_username", username);
         onboarding.classList.add("hidden");
@@ -1844,10 +1848,7 @@ function getVerifiedBadge(isVerified) {
         if (!safetyEl) return;
 
         safetyEl.textContent = "…";
-        if (statusEl) {
-            statusEl.classList.add("hidden");
-            statusEl.textContent = "";
-        }
+        if (statusEl) { statusEl.classList.add("hidden"); statusEl.textContent = ""; }
         if (verifyBtn) {
             verifyBtn.disabled = false;
             verifyBtn.textContent = "Verify";
@@ -1859,15 +1860,16 @@ function getVerifiedBadge(isVerified) {
             if (verifyBtn) verifyBtn.disabled = true;
             return;
         }
+
         if (!window.ZChatE2EE) {
-            safetyEl.textContent = "E2EE unavailable";
+            safetyEl.textContent = "E2EE unavailable (reload / check js/e2ee.js)";
+            console.warn("[E2EE] window.ZChatE2EE is missing — is js/e2ee.js loaded before main.js?");
             return;
         }
 
         try {
-            await window.ZChatE2EE.ensureUserKeys(
-                currentUsername || localStorage.getItem("zchat_username") || ""
-            );
+            const me = currentUsername || localStorage.getItem("zchat_username") || "";
+            await window.ZChatE2EE.ensureUserKeys(me);
             const myPub = window.ZChatE2EE.getLocalPublicKey();
             let partnerPub = chat.participant.publicKey || null;
             let partnerId = chat.participant.userId || null;
@@ -1885,11 +1887,13 @@ function getVerifiedBadge(isVerified) {
             if (myPub && partnerPub) {
                 const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
                 safetyEl.textContent = num || "—";
+            } else if (!myPub) {
+                safetyEl.textContent = "Your keys missing — re-login";
             } else {
-                safetyEl.textContent = "Keys not ready";
+                safetyEl.textContent = "Partner has no public key yet";
             }
 
-            if (partnerId && window.ZChatE2EE.hasVerifiedUser) {
+            if (partnerId) {
                 const already = await window.ZChatE2EE.hasVerifiedUser(partnerId);
                 if (already) {
                     if (statusEl) {
@@ -1905,7 +1909,7 @@ function getVerifiedBadge(isVerified) {
             }
         } catch (err) {
             console.error("[E2EE] refreshContactSecurityUI:", err);
-            safetyEl.textContent = "Error loading";
+            safetyEl.textContent = "Error: " + (err.message || "load failed");
         }
     }
 
@@ -1923,15 +1927,14 @@ function getVerifiedBadge(isVerified) {
     openInfoBtn.addEventListener("click", openInfoDrawer);
     closeInfoBtn.addEventListener("click", closeInfoDrawer);
 
-    // Copy Safety Number
     const copySafetyNumberBtn = document.getElementById("copySafetyNumberBtn");
     if (copySafetyNumberBtn) {
         copySafetyNumberBtn.addEventListener("click", async () => {
             const el = document.getElementById("safetyNumberValue");
-            const text = el ? el.textContent.trim() : "";
-            if (!text || text === "—" || text === "…") return;
+            const t = el ? el.textContent.trim() : "";
+            if (!t || t === "—" || t === "…") return;
             try {
-                await navigator.clipboard.writeText(text);
+                await navigator.clipboard.writeText(t);
                 const prev = copySafetyNumberBtn.textContent;
                 copySafetyNumberBtn.textContent = "Copied!";
                 setTimeout(() => { copySafetyNumberBtn.textContent = prev; }, 1500);
@@ -1939,16 +1942,13 @@ function getVerifiedBadge(isVerified) {
         });
     }
 
-    // Mark as Verified
     const markVerifiedBtn = document.getElementById("markVerifiedBtn");
     if (markVerifiedBtn) {
         markVerifiedBtn.addEventListener("click", async () => {
             const chat = state.chats.find((c) => c.id === state.activeChatId);
             if (!chat || !window.ZChatE2EE) return;
-
             markVerifiedBtn.disabled = true;
             markVerifiedBtn.textContent = "…";
-
             try {
                 let partnerId = chat.participant.userId;
                 if (!partnerId) {
@@ -1961,13 +1961,9 @@ function getVerifiedBadge(isVerified) {
                 }
                 if (!partnerId) {
                     markVerifiedBtn.textContent = "No ID";
-                    setTimeout(() => {
-                        markVerifiedBtn.textContent = "Verify";
-                        markVerifiedBtn.disabled = false;
-                    }, 1500);
+                    setTimeout(() => { markVerifiedBtn.textContent = "Verify"; markVerifiedBtn.disabled = false; }, 1500);
                     return;
                 }
-
                 await window.ZChatE2EE.markUserAsVerified(partnerId);
                 const statusEl = document.getElementById("markVerifiedStatus");
                 if (statusEl) {
@@ -2392,6 +2388,24 @@ function getVerifiedBadge(isVerified) {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
             });
 
+            if (window.ZChatE2EE) {
+                try {
+                    await window.ZChatE2EE.ensureUserKeys(me);
+                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                    if (priv) {
+                        for (const c of state.chats) {
+                            for (const msg of c.messages) {
+                                if (!msg.text) continue;
+                                const plain = await window.ZChatE2EE.safeDecryptContent(msg.text, priv);
+                                if (plain != null) msg.text = plain;
+                            }
+                        }
+                    }
+                } catch (e2eeErr) {
+                    console.error("[E2EE] decrypt on load:", e2eeErr);
+                }
+            }
+
             renderChatList();
             const activeChat = state.chats.find((c) => c.id === state.activeChatId);
             if (activeChat) renderMessages(activeChat);
@@ -2431,11 +2445,32 @@ function getVerifiedBadge(isVerified) {
             state.activeChatId = realChatId;
         }
 
+        let contentToStore = msgObj.text || msgObj.attachment || "";
+        if (window.ZChatE2EE && contentToStore && currentChat && currentChat.participant.name !== "Saved Messages") {
+            try {
+                await window.ZChatE2EE.ensureUserKeys(me);
+                const partner = await window.ZChatE2EE.fetchPublicKeyForUsername(currentChat.participant.name);
+                const keysMap = {};
+                const myPublic = window.ZChatE2EE.getLocalPublicKey();
+                if (myPublic) keysMap[me.toLowerCase()] = myPublic;
+                if (partner && partner.public_key) {
+                    keysMap[String(partner.username || currentChat.participant.name).toLowerCase()] = partner.public_key;
+                    currentChat.participant.publicKey = partner.public_key;
+                    if (partner.id) currentChat.participant.userId = partner.id;
+                }
+                if (Object.keys(keysMap).length) {
+                    contentToStore = await window.ZChatE2EE.encryptMessageForUsers(contentToStore, keysMap);
+                }
+            } catch (e2eeErr) {
+                console.error("[E2EE] encrypt failed, sending plaintext:", e2eeErr);
+            }
+        }
+
         const row = {
             id: makeUuid(),
             chat_id: realChatId,
             sender_username: msgObj.senderId === "me" ? me : String(msgObj.senderId || me),
-            content: msgObj.text || msgObj.attachment || "",
+            content: contentToStore,
             created_at: new Date(msgObj.createdAt || Date.now()).toISOString(),
         };
         try {
@@ -2553,7 +2588,7 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "INSERT", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const newMsg = payload.new;
                         if (!newMsg) return;
@@ -2598,10 +2633,20 @@ function getVerifiedBadge(isVerified) {
                         // Tránh trùng (tin mình vừa gửi local)
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
 
+                        let rtText = newMsg.content || "";
+                        if (window.ZChatE2EE && rtText) {
+                            try {
+                                const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                if (priv) {
+                                    const plain = await window.ZChatE2EE.safeDecryptContent(rtText, priv);
+                                    if (plain != null) rtText = plain;
+                                }
+                            } catch (_) {}
+                        }
                         chat.messages.push({
                             id: newMsg.id,
                             senderId: newMsg.sender_username === me ? "me" : newMsg.sender_username || "other",
-                            text: newMsg.content || "",
+                            text: rtText,
                             createdAt: new Date(newMsg.created_at).getTime(),
                             status: "read",
                         });

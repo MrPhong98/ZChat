@@ -108,9 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const recoveryPassword = generateRecoveryPassword();
 
             try {
-                // Sinh cặp khóa RSA-OAEP trước khi tạo tài khoản
-                let public_key = null;
-                let private_key = null;
+                let public_key = null, private_key = null;
                 if (window.ZChatE2EE) {
                     const pair = await window.ZChatE2EE.generateKeyPairJwk();
                     public_key = pair.publicKey;
@@ -189,13 +187,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (loginError) loginError.classList.add("hidden");
                 saveSession(data);
-                // Bổ sung khóa nếu tài khoản cũ chưa có E2EE keys
                 if (window.ZChatE2EE) {
-                    try {
-                        await window.ZChatE2EE.ensureUserKeys(data.username, data);
-                    } catch (e2eeErr) {
-                        console.error("[E2EE] ensureUserKeys on login:", e2eeErr);
-                    }
+                    try { await window.ZChatE2EE.ensureUserKeys(data.username, data); }
+                    catch (e) { console.error("[E2EE] login keys:", e); }
                 }
                 enterChatApp(data.username);
             } catch (err) {
