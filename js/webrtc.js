@@ -15,7 +15,7 @@
     const SIGNAL_URL =
         window.ZCHAT_SIGNAL_URL ||
         localStorage.getItem("zchat_signal_url") ||
-        "http://localhost:5000";
+        "https://zchat-backend-call.onrender.com";
 
     const ICE_SERVERS = {
         iceServers: [
