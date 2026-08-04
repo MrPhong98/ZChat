@@ -147,28 +147,13 @@ textarea { field-sizing: content; }
 
 .msg-action-menu {
     position: fixed;
-    z-index: 300;
+    z-index: 200;
     min-width: 200px;
     border-radius: 16px;
     padding: 6px;
     box-shadow: 0 16px 48px rgba(0,0,0,.35);
     background-color: var(--elevated2);
     border: 1px solid var(--transparent-border);
-    /* Tránh animation transform làm lệch vị trí fixed trên mobile */
-    transform: none !important;
-}
-
-/* Nút 3 chấm luôn dưới text box (composer z-20) */
-.btn-msg-menu {
-    z-index: 1 !important;
-}
-#composerBar {
-    z-index: 20;
-    isolation: isolate;
-}
-#messageFeed {
-    isolation: isolate;
-    z-index: 0;
 }
 .msg-action-item {
     width: 100%;
@@ -312,4 +297,15 @@ select.custom-select {
     background-repeat: no-repeat;
     background-position: right 14px center;
     padding-right: 38px !important;
+}
+
+/* ============ VIDEO CALL ============ */
+.zc-call-btn-off {
+    background: #ef4444 !important;
+}
+#zcCallModal:not(.hidden) {
+    animation: fade-in .18s ease-out;
+}
+#zcLocalVideo {
+    z-index: 5;
 }
