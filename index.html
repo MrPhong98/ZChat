@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
           rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="any"/>
     <link rel="icon" href="/assets/img/favicon-16.png" type="image/png" sizes="any"/>
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png"/>
@@ -517,6 +518,46 @@
                         <!-- Options Card -->
                         <div class="w-full rounded-2xl p-4 space-y-4"
                              style="background-color: var(--canvas); border: 1px solid var(--hairline);">
+
+                            <!-- Safety Number (E2EE) -->
+                            <div id="safetyNumberSection" class="space-y-2">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="shield-check" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
+                                    <div class="min-w-0 flex-1">
+                                        <p id="safetyNumberTitle" class="text-xs font-bold" style="color: var(--ink);">Safety Number</p>
+                                        <p id="safetyNumberDesc" class="text-[11px]" style="color: var(--muted);">Compare with contact to prevent MITM</p>
+                                    </div>
+                                </div>
+                                <div class="rounded-xl px-3 py-2.5 font-mono text-[12px] leading-relaxed tracking-wide select-all break-all"
+                                     style="background-color: var(--elevated); color: var(--ink); border: 1px solid var(--transparent-border);"
+                                     id="safetyNumberValue">—</div>
+                                <button type="button" id="copySafetyNumberBtn"
+                                        class="w-full rounded-xl px-3 py-2 text-xs font-semibold transition-colors hover:opacity-90"
+                                        style="background-color: var(--elevated); color: var(--ink); border: 1px solid var(--transparent-border);">
+                                    Copy Safety Number
+                                </button>
+                            </div>
+
+                            <div style="border-top: 1px solid var(--hairline);"></div>
+
+                            <!-- Mark as Verified (E2EE) -->
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <i data-lucide="badge-check" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
+                                    <div class="min-w-0">
+                                        <p id="markVerifiedTitle" class="text-xs font-bold" style="color: var(--ink);">Mark as Verified</p>
+                                        <p id="markVerifiedDesc" class="text-[11px]" style="color: var(--muted);">Confirm identity after comparing numbers</p>
+                                    </div>
+                                </div>
+                                <button type="button" id="markVerifiedBtn"
+                                        class="shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
+                                        style="background-color: #1b98e0; color: #fff;">
+                                    Verify
+                                </button>
+                            </div>
+                            <p id="markVerifiedStatus" class="hidden text-[11px] font-medium px-1" style="color: #31D07C;"></p>
+
+                            <div style="border-top: 1px solid var(--hairline);"></div>
 
                             <!-- Disappearing Message Option -->
                             <div class="flex items-center justify-between gap-3">
