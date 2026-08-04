@@ -1847,11 +1847,9 @@ function getVerifiedBadge(isVerified) {
         const preview = document.getElementById("safetyNumberPreview");
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (preview) {
-            if (!chat || chat.participant.name === "Saved Messages") {
-                preview.textContent = "Not available";
-            } else {
-                preview.textContent = "Tap to verify encryption";
-            }
+            preview.textContent = (!chat || chat.participant.name === "Saved Messages")
+                ? "Not available"
+                : "Tap to verify encryption";
         }
     }
     function closeInfoDrawer() {
@@ -1862,7 +1860,7 @@ function getVerifiedBadge(isVerified) {
     openInfoBtn.addEventListener("click", openInfoDrawer);
     closeInfoBtn.addEventListener("click", closeInfoDrawer);
 
-    /* ============ SAFETY NUMBER MODAL ============ */
+    /* ============ SAFETY NUMBER POPUP ============ */
     const safetyNumberModal = document.getElementById("safetyNumberModal");
     const openSafetyNumberBtn = document.getElementById("openSafetyNumberBtn");
     const closeSafetyNumberBtn = document.getElementById("closeSafetyNumberBtn");
@@ -1870,7 +1868,6 @@ function getVerifiedBadge(isVerified) {
     let _safetyPartnerId = null;
 
     function formatSafetyGrid(numStr) {
-        // "12345 67890 ..." → HTML rows of 4 groups
         const parts = (numStr || "").trim().split(/\s+/).filter(Boolean);
         if (!parts.length) return "—";
         let html = "";
@@ -1881,6 +1878,44 @@ function getVerifiedBadge(isVerified) {
             html += `<div>${row}</div>`;
         }
         return html;
+    }
+
+    /** Draw ZChat bubble logo in center of QR canvas */
+    function drawZChatLogoOnQr(canvas) {
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const size = canvas.width;
+        const logoBox = Math.round(size * 0.28);
+        const x = (size - logoBox) / 2;
+        const y = (size - logoBox) / 2;
+        const r = logoBox * 0.22;
+
+        // white/dark plate so QR quiet-zone is readable
+        ctx.fillStyle = "#0a0a0a";
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + logoBox, y, x + logoBox, y + logoBox, r);
+        ctx.arcTo(x + logoBox, y + logoBox, x, y + logoBox, r);
+        ctx.arcTo(x, y + logoBox, x, y, r);
+        ctx.arcTo(x, y, x + logoBox, y, r);
+        ctx.closePath();
+        ctx.fill();
+
+        // ZChat bubble path (viewBox 0 0 100 100) scaled into logoBox
+        const pad = logoBox * 0.18;
+        const s = (logoBox - pad * 2) / 100;
+        ctx.save();
+        ctx.translate(x + pad, y + pad);
+        ctx.scale(s, s);
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 7;
+        ctx.lineJoin = "round";
+        const p = new Path2D(
+            "M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+        );
+        ctx.fill(p);
+        ctx.restore();
     }
 
     async function openSafetyNumberModal() {
@@ -1909,7 +1944,10 @@ function getVerifiedBadge(isVerified) {
 
         if (!window.ZChatE2EE) {
             if (grid) grid.textContent = "E2EE unavailable";
-            if (errEl) { errEl.textContent = "Missing js/e2ee.js — upload and hard refresh"; errEl.classList.remove("hidden"); }
+            if (errEl) {
+                errEl.textContent = "Missing js/e2ee.js — upload and hard refresh";
+                errEl.classList.remove("hidden");
+            }
             return;
         }
 
@@ -1942,14 +1980,15 @@ function getVerifiedBadge(isVerified) {
             const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
             if (grid) grid.innerHTML = formatSafetyGrid(num);
 
-            // QR = safety number string
             if (canvas && typeof QRCode !== "undefined" && num) {
                 try {
                     await QRCode.toCanvas(canvas, num.replace(/\s+/g, ""), {
                         width: 200,
-                        margin: 1,
+                        margin: 2,
+                        errorCorrectionLevel: "H", // high — allows center logo
                         color: { dark: "#ffffff", light: "#0a0a0a" },
                     });
+                    drawZChatLogoOnQr(canvas);
                 } catch (qrErr) {
                     console.warn("[E2EE] QR render:", qrErr);
                 }
@@ -1966,7 +2005,10 @@ function getVerifiedBadge(isVerified) {
         } catch (err) {
             console.error("[E2EE] safety modal:", err);
             if (grid) grid.textContent = "Error";
-            if (errEl) { errEl.textContent = err.message || "Failed to load"; errEl.classList.remove("hidden"); }
+            if (errEl) {
+                errEl.textContent = err.message || "Failed to load";
+                errEl.classList.remove("hidden");
+            }
         }
     }
 
@@ -1982,6 +2024,11 @@ function getVerifiedBadge(isVerified) {
     }
     if (closeSafetyNumberBtn) {
         closeSafetyNumberBtn.addEventListener("click", closeSafetyNumberModal);
+    }
+    if (safetyNumberModal) {
+        safetyNumberModal.addEventListener("click", (e) => {
+            if (e.target === safetyNumberModal) closeSafetyNumberModal();
+        });
     }
     if (safetyMarkVerifiedBtn) {
         safetyMarkVerifiedBtn.addEventListener("click", async () => {
@@ -2411,7 +2458,6 @@ function getVerifiedBadge(isVerified) {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
             });
 
-            // E2EE batch decrypt (parallel + cached private key)
             if (window.ZChatE2EE) {
                 try {
                     await window.ZChatE2EE.ensureUserKeys(me);
