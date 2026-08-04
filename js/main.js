@@ -1,11 +1,7 @@
 // Hàm tạo icon tích xanh xài Path của bạn cung cấp
 function getVerifiedBadge(isVerified) {
-    if (!isVerified) return '';
-    return `
-        <svg class="w-4 h-4 text-blue-500 inline-block ml-1 align-text-bottom flex-shrink-0" fill="currentColor" viewBox="0 0 22 22" title="Đã xác minh">
-            <path d="M 20.396 11 c -0.018 -0.646 -0.215 -1.275 -0.57 -1.816 c -0.354 -0.54 -0.852 -0.972 -1.438 -1.246 c 0.223 -0.607 0.27 -1.264 0.14 -1.897 c -0.131 -0.634 -0.437 -1.218 -0.882 -1.687 c -0.47 -0.445 -1.053 -0.75 -1.687 -0.882 c -0.633 -0.13 -1.29 -0.083 -1.897 0.14 c -0.273 -0.587 -0.704 -1.086 -1.245 -1.44 S 11.647 1.62 11 1.604 c -0.646 0.017 -1.273 0.213 -1.813 0.568 s -0.969 0.854 -1.24 1.44 c -0.608 -0.223 -1.267 -0.272 -1.902 -0.14 c -0.635 0.13 -1.22 0.436 -1.69 0.882 c -0.445 0.47 -0.749 1.055 -0.878 1.688 c -0.13 0.633 -0.08 1.29 0.144 1.896 c -0.587 0.274 -1.087 0.705 -1.443 1.245 c -0.356 0.54 -0.555 1.17 -0.574 1.817 c 0.02 0.647 0.218 1.276 0.574 1.817 c 0.356 0.54 0.856 0.972 1.443 1.245 c -0.224 0.606 -0.274 1.263 -0.144 1.896 c 0.13 0.634 0.433 1.218 0.877 1.688 c 0.47 0.443 1.054 0.747 1.687 0.878 c 0.633 0.132 1.29 0.084 1.897 -0.136 c 0.274 0.586 0.705 1.084 1.246 1.439 c 0.54 0.354 1.17 0.551 1.816 0.569 c 0.647 -0.016 1.276 -0.213 1.817 -0.567 s 0.972 -0.854 1.245 -1.44 c 0.604 0.239 1.266 0.296 1.903 0.164 c 0.636 -0.132 1.22 -0.447 1.68 -0.907 c 0.46 -0.46 0.776 -1.044 0.908 -1.681 s 0.075 -1.299 -0.165 -1.903 c 0.586 -0.274 1.084 -0.705 1.439 -1.246 c 0.354 -0.54 0.551 -1.17 0.569 -1.816 Z M 9.662 14.85 l -3.429 -3.428 l 1.293 -1.302 l 2.072 2.072 l 4.4 -4.794 l 1.347 1.246 Z" />
-        </svg>
-    `;
+    if (!isVerified) return "";
+    return `<svg class="inline-block flex-shrink-0 text-blue-500" width="14" height="14" viewBox="0 0 22 22" fill="currentColor" style="margin-left:2px;vertical-align:-2px" title="Verified"><path d="M 20.396 11 c -0.018 -0.646 -0.215 -1.275 -0.57 -1.816 c -0.354 -0.54 -0.852 -0.972 -1.438 -1.246 c 0.223 -0.607 0.27 -1.264 0.14 -1.897 c -0.131 -0.634 -0.437 -1.218 -0.882 -1.687 c -0.47 -0.445 -1.053 -0.75 -1.687 -0.882 c -0.633 -0.13 -1.29 -0.083 -1.897 0.14 c -0.273 -0.587 -0.704 -1.086 -1.245 -1.44 S 11.647 1.62 11 1.604 c -0.646 0.017 -1.273 0.213 -1.813 0.568 s -0.969 0.854 -1.24 1.44 c -0.608 -0.223 -1.267 -0.272 -1.902 -0.14 c -0.635 0.13 -1.22 0.436 -1.69 0.882 c -0.445 0.47 -0.749 1.055 -0.878 1.688 c -0.13 0.633 -0.08 1.29 0.144 1.896 c -0.587 0.274 -1.087 0.705 -1.443 1.245 c -0.356 0.54 -0.555 1.17 -0.574 1.817 c 0.02 0.647 0.218 1.276 0.574 1.817 c 0.356 0.54 0.856 0.972 1.443 1.245 c -0.224 0.606 -0.274 1.263 -0.144 1.896 c 0.13 0.634 0.433 1.218 0.877 1.688 c 0.47 0.443 1.054 0.747 1.687 0.878 c 0.633 0.132 1.29 0.084 1.897 -0.136 c 0.274 0.586 0.705 1.084 1.246 1.439 c 0.54 0.354 1.17 0.551 1.816 0.569 c 0.647 -0.016 1.276 -0.213 1.817 -0.567 s 0.972 -0.854 1.245 -1.44 c 0.604 0.239 1.266 0.296 1.903 0.164 c 0.636 -0.132 1.22 -0.447 1.68 -0.907 c 0.46 -0.46 0.776 -1.044 0.908 -1.681 s 0.075 -1.299 -0.165 -1.903 c 0.586 -0.274 1.084 -0.705 1.439 -1.246 c 0.354 -0.54 0.551 -1.17 0.569 -1.816 Z M 9.662 14.85 l -3.429 -3.428 l 1.293 -1.302 l 2.072 2.072 l 4.4 -4.794 l 1.347 1.246 Z"/></svg>`;
 }
 (function () {
     "use strict";
@@ -399,7 +395,6 @@ function getVerifiedBadge(isVerified) {
         participant.avatarEmoji = row.avatar_emoji || null;
         participant.avatarUrl = row.avatar_url || null;
         participant.isVerified = !!row.is_verified;
-        // Đổi username trên server → cập nhật tên hiển thị bên chat
         if (row.username && participant.name !== "Saved Messages") {
             participant.name = row.username;
         }
@@ -460,7 +455,7 @@ function getVerifiedBadge(isVerified) {
         }
     }
 
-    /* Nghe realtime khi user khác đổi avatar / username -> cập nhật ngay không cần reload */
+    /* Nghe realtime khi user khác đổi avatar -> cập nhật ngay không cần reload */
     function subscribeToUserAvatarChanges() {
         if (!window.supabaseClient) return;
 
@@ -473,26 +468,13 @@ function getVerifiedBadge(isVerified) {
                     try {
                         const row = payload.new;
                         if (!row || !row.username) return;
-                        const oldName = (payload.old && payload.old.username) || null;
-                        const newName = row.username;
 
-                        // Khớp theo tên cũ HOẶC tên mới (đổi username / chỉ đổi avatar)
-                        const chat = state.chats.find((c) => {
-                            if (!c.participant || !c.participant.name) return false;
-                            if (c.participant.name === "Saved Messages") return false;
-                            const p = c.participant.name.toLowerCase();
-                            if (p === newName.toLowerCase()) return true;
-                            if (oldName && p === String(oldName).toLowerCase()) return true;
-                            // Fallback: chat_id còn chứa username cũ
-                            if (oldName && c.id && c.id.toLowerCase().includes(String(oldName).toLowerCase())) return true;
-                            return false;
-                        });
+                        const chat = state.chats.find(
+                            (c) => c.participant && c.participant.name && c.participant.name.toLowerCase() === row.username.toLowerCase()
+                        );
                         if (!chat) return;
 
                         applyAvatarFields(chat.participant, row);
-                        // Đảm bảo tên hiển thị là username mới
-                        if (newName) chat.participant.name = newName;
-
                         renderChatList();
                         if (state.activeChatId === chat.id) renderActiveChat();
                     } catch (err) {
@@ -1122,7 +1104,7 @@ function getVerifiedBadge(isVerified) {
           <div class="flex items-center justify-between gap-2">
             <span class="flex min-w-0 items-center gap-1.5 truncate">
               ${pinIcon}
-              <span class="truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}</span>
+              <span class="inline-flex min-w-0 items-center truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}${getVerifiedBadge(!!chat.participant.isVerified)}</span>
             </span>
             ${last ? `<span class="shrink-0 text-xs font-medium" style="color: ${chat.unread > 0 ? "var(--ink)" : "var(--faint)"};">${formatListTimestamp(last.createdAt)}</span>` : ""}
           </div>
@@ -1273,13 +1255,15 @@ function getVerifiedBadge(isVerified) {
         activeChatEl.classList.add("flex");
 
         chatHeaderAvatar.innerHTML = avatarHtml(chat.participant, 40);
-        chatHeaderName.textContent = chat.participant.name;
+        const verifiedBadge = getVerifiedBadge(!!chat.participant.isVerified);
+        chatHeaderName.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
         chatHeaderStatus.innerHTML = chat.participant.online
             ? `<span style="color: var(--online); font-weight:600;">Online</span>`
             : escapeHtml(formatLastSeen(chat.participant.lastSeen));
 
         document.getElementById("infoAvatar").innerHTML = avatarHtml(chat.participant, 64);
-        document.getElementById("infoName").textContent = chat.participant.name;
+        const infoNameEl = document.getElementById("infoName");
+        if (infoNameEl) infoNameEl.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
         document.getElementById("infoUsername").textContent = "@" + chat.participant.name.toLowerCase().replace(/\s+/g, "");
 
         updateDisappearingUI(chat.disappearingTime || "off");
@@ -2123,7 +2107,7 @@ function getVerifiedBadge(isVerified) {
             try {
                 const { data: userData, error } = await window.supabaseClient
                     .from("users")
-                    .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                    .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
                     .ilike("username", rawName)
                     .maybeSingle();
 
@@ -2274,16 +2258,6 @@ function getVerifiedBadge(isVerified) {
 
             state.chats.forEach((c) => {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
-                // Tên hiển thị ưu tiên username thật từ tin nhắn (sau khi đối phương đổi tên)
-                if (c.participant && c.participant.name !== "Saved Messages") {
-                    for (let i = c.messages.length - 1; i >= 0; i--) {
-                        const m = c.messages[i];
-                        if (m.senderId && m.senderId !== "me" && m.senderId !== "other") {
-                            c.participant.name = m.senderId;
-                            break;
-                        }
-                    }
-                }
             });
 
             renderChatList();
@@ -2313,14 +2287,11 @@ function getVerifiedBadge(isVerified) {
 
         let realChatId = chatId;
 
-        // Saved Messages
+        // Nếu là Saved Messages hoặc gửi cho chính mình
         if (!currentChat || currentChat.participant.name === "Saved Messages" || chatId.startsWith("saved_")) {
             realChatId = `saved_${me.toLowerCase()}`;
-        } else if (chatId && chatId.startsWith("chat_")) {
-            // Giữ nguyên chat_id đã có — tránh tách lịch sử khi ai đó đổi username
-            realChatId = chatId;
         } else {
-            // Chat mới chưa có id chuẩn
+            // Nếu gửi cho người dùng khác, tự động tạo/chuẩn hóa ID dạng chat_userA_userB (sắp xếp A-Z)
             const otherUser = currentChat.participant.name.trim();
             const sortedUsers = [me.toLowerCase(), otherUser.toLowerCase()].sort();
             realChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
