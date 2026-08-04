@@ -1905,7 +1905,9 @@ function getVerifiedBadge(isVerified) {
         if (canvas && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
             try {
                 await QRCode.toCanvas(canvas, data, {
-                    width: 200, margin: 2, errorCorrectionLevel: "H",
+                    width: 192,
+                    margin: 4, // quiet zone — không sát mép
+                    errorCorrectionLevel: "H",
                     color: { dark: "#ffffff", light: "#0a0a0a" },
                 });
                 ok = true;
@@ -1913,7 +1915,7 @@ function getVerifiedBadge(isVerified) {
         }
         if (!ok && img) {
             img.onload = () => { img.classList.remove("hidden"); if (canvas) canvas.classList.add("hidden"); };
-            img.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&color=ffffff&bgcolor=0a0a0a&data="
+            img.src = "https://api.qrserver.com/v1/create-qr-code/?size=192x192&margin=12&ecc=H&color=ffffff&bgcolor=0a0a0a&data="
                 + encodeURIComponent(data);
         }
     }
