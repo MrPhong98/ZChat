@@ -1,8 +1,8 @@
 // Hàm tạo icon tích xanh xài Path của bạn cung cấp
 function getVerifiedBadge(isVerified) {
     if (!isVerified) return "";
-    // Class .verified-badge trong style.css căn đáy với chữ
-    return '<svg class="verified-badge" viewBox="0 0 22 22" fill="currentColor" title="Verified" aria-label="Verified"><path d="M 20.396 11 c -0.018 -0.646 -0.215 -1.275 -0.57 -1.816 c -0.354 -0.54 -0.852 -0.972 -1.438 -1.246 c 0.223 -0.607 0.27 -1.264 0.14 -1.897 c -0.131 -0.634 -0.437 -1.218 -0.882 -1.687 c -0.47 -0.445 -1.053 -0.75 -1.687 -0.882 c -0.633 -0.13 -1.29 -0.083 -1.897 0.14 c -0.273 -0.587 -0.704 -1.086 -1.245 -1.44 S 11.647 1.62 11 1.604 c -0.646 0.017 -1.273 0.213 -1.813 0.568 s -0.969 0.854 -1.24 1.44 c -0.608 -0.223 -1.267 -0.272 -1.902 -0.14 c -0.635 0.13 -1.22 0.436 -1.69 0.882 c -0.445 0.47 -0.749 1.055 -0.878 1.688 c -0.13 0.633 -0.08 1.29 0.144 1.896 c -0.587 0.274 -1.087 0.705 -1.443 1.245 c -0.356 0.54 -0.555 1.17 -0.574 1.817 c 0.02 0.647 0.218 1.276 0.574 1.817 c 0.356 0.54 0.856 0.972 1.443 1.245 c -0.224 0.606 -0.274 1.263 -0.144 1.896 c 0.13 0.634 0.433 1.218 0.877 1.688 c 0.47 0.443 1.054 0.747 1.687 0.878 c 0.633 0.132 1.29 0.084 1.897 -0.136 c 0.274 0.586 0.705 1.084 1.246 1.439 c 0.54 0.354 1.17 0.551 1.816 0.569 c 0.647 -0.016 1.276 -0.213 1.817 -0.567 s 0.972 -0.854 1.245 -1.44 c 0.604 0.239 1.266 0.296 1.903 0.164 c 0.636 -0.132 1.22 -0.447 1.68 -0.907 c 0.46 -0.46 0.776 -1.044 0.908 -1.681 s 0.075 -1.299 -0.165 -1.903 c 0.586 -0.274 1.084 -0.705 1.439 -1.246 c 0.354 -0.54 0.551 -1.17 0.569 -1.816 Z M 9.662 14.85 l -3.429 -3.428 l 1.293 -1.302 l 2.072 2.072 l 4.4 -4.794 l 1.347 1.246 Z"/></svg>';
+    // 18px — to hơn một chút, vẫn sát tên
+    return `<svg class="inline-block flex-shrink-0 text-blue-500" width="18" height="18" viewBox="0 0 22 22" fill="currentColor" style="margin-left:3px;vertical-align:-3px" title="Verified"><path d="M 20.396 11 c -0.018 -0.646 -0.215 -1.275 -0.57 -1.816 c -0.354 -0.54 -0.852 -0.972 -1.438 -1.246 c 0.223 -0.607 0.27 -1.264 0.14 -1.897 c -0.131 -0.634 -0.437 -1.218 -0.882 -1.687 c -0.47 -0.445 -1.053 -0.75 -1.687 -0.882 c -0.633 -0.13 -1.29 -0.083 -1.897 0.14 c -0.273 -0.587 -0.704 -1.086 -1.245 -1.44 S 11.647 1.62 11 1.604 c -0.646 0.017 -1.273 0.213 -1.813 0.568 s -0.969 0.854 -1.24 1.44 c -0.608 -0.223 -1.267 -0.272 -1.902 -0.14 c -0.635 0.13 -1.22 0.436 -1.69 0.882 c -0.445 0.47 -0.749 1.055 -0.878 1.688 c -0.13 0.633 -0.08 1.29 0.144 1.896 c -0.587 0.274 -1.087 0.705 -1.443 1.245 c -0.356 0.54 -0.555 1.17 -0.574 1.817 c 0.02 0.647 0.218 1.276 0.574 1.817 c 0.356 0.54 0.856 0.972 1.443 1.245 c -0.224 0.606 -0.274 1.263 -0.144 1.896 c 0.13 0.634 0.433 1.218 0.877 1.688 c 0.47 0.443 1.054 0.747 1.687 0.878 c 0.633 0.132 1.29 0.084 1.897 -0.136 c 0.274 0.586 0.705 1.084 1.246 1.439 c 0.54 0.354 1.17 0.551 1.816 0.569 c 0.647 -0.016 1.276 -0.213 1.817 -0.567 s 0.972 -0.854 1.245 -1.44 c 0.604 0.239 1.266 0.296 1.903 0.164 c 0.636 -0.132 1.22 -0.447 1.68 -0.907 c 0.46 -0.46 0.776 -1.044 0.908 -1.681 s 0.075 -1.299 -0.165 -1.903 c 0.586 -0.274 1.084 -0.705 1.439 -1.246 c 0.354 -0.54 0.551 -1.17 0.569 -1.816 Z M 9.662 14.85 l -3.429 -3.428 l 1.293 -1.302 l 2.072 2.072 l 4.4 -4.794 l 1.347 1.246 Z"/></svg>`;
 }
 (function () {
     "use strict";
@@ -920,11 +920,6 @@ function getVerifiedBadge(isVerified) {
       </div>`;
         }
 
-        const dotSize = Math.round(size * 0.28);
-        const statusDot = participant.online
-            ? `<span class="absolute bottom-0 right-0 rounded-full border-2 bg-online" style="border-color: var(--surface); width:${dotSize}px;height:${dotSize}px"></span>`
-            : "";
-
         const innerAvatar = (participant.avatarType === "photo" && participant.avatarUrl)
             ? `<img src="${participant.avatarUrl}" alt="${initials(participant.name)}" class="h-full w-full rounded-full object-cover select-none" />`
             : (participant.avatarType === "emoji" && participant.avatarEmoji)
@@ -934,7 +929,6 @@ function getVerifiedBadge(isVerified) {
         return `
       <div class="relative shrink-0" style="width:${size}px;height:${size}px">
         ${innerAvatar}
-        ${statusDot}
       </div>
     `;
     }
@@ -1105,7 +1099,7 @@ function getVerifiedBadge(isVerified) {
           <div class="flex items-center justify-between gap-2">
             <span class="flex min-w-0 items-center gap-1.5 truncate">
               ${pinIcon}
-              <span class="verified-name truncate text-[15px] font-bold" style="color: var(--ink);"><span class="truncate">${escapeHtml(chat.participant.name)}</span>${getVerifiedBadge(!!chat.participant.isVerified)}</span>
+              <span class="inline-flex min-w-0 items-center truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}${getVerifiedBadge(!!chat.participant.isVerified)}</span>
             </span>
             ${last ? `<span class="shrink-0 text-xs font-medium" style="color: ${chat.unread > 0 ? "var(--ink)" : "var(--faint)"};">${formatListTimestamp(last.createdAt)}</span>` : ""}
           </div>
@@ -1257,12 +1251,12 @@ function getVerifiedBadge(isVerified) {
 
         chatHeaderAvatar.innerHTML = avatarHtml(chat.participant, 40);
         const verifiedBadge = getVerifiedBadge(!!chat.participant.isVerified);
-        chatHeaderName.innerHTML = '<span class="verified-name">' + escapeHtml(chat.participant.name) + verifiedBadge + '</span>';
+        chatHeaderName.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
         chatHeaderStatus.textContent = "";
 
         document.getElementById("infoAvatar").innerHTML = avatarHtml(chat.participant, 64);
         const infoNameEl = document.getElementById("infoName");
-        if (infoNameEl) infoNameEl.innerHTML = '<span class="verified-name">' + escapeHtml(chat.participant.name) + verifiedBadge + '</span>';
+        if (infoNameEl) infoNameEl.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
         document.getElementById("infoUsername").textContent = "@" + chat.participant.name.toLowerCase().replace(/\s+/g, "");
 
         updateDisappearingUI(chat.disappearingTime || "off");
@@ -1843,9 +1837,83 @@ function getVerifiedBadge(isVerified) {
         }
     });
 
+    async function refreshContactSecurityUI(chat) {
+        const safetyEl = document.getElementById("safetyNumberValue");
+        const statusEl = document.getElementById("markVerifiedStatus");
+        const verifyBtn = document.getElementById("markVerifiedBtn");
+        if (!safetyEl) return;
+
+        safetyEl.textContent = "…";
+        if (statusEl) {
+            statusEl.classList.add("hidden");
+            statusEl.textContent = "";
+        }
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = "Verify";
+            verifyBtn.style.opacity = "1";
+        }
+
+        if (!chat || !chat.participant || chat.participant.name === "Saved Messages") {
+            safetyEl.textContent = "—";
+            if (verifyBtn) verifyBtn.disabled = true;
+            return;
+        }
+        if (!window.ZChatE2EE) {
+            safetyEl.textContent = "E2EE unavailable";
+            return;
+        }
+
+        try {
+            await window.ZChatE2EE.ensureUserKeys(
+                currentUsername || localStorage.getItem("zchat_username") || ""
+            );
+            const myPub = window.ZChatE2EE.getLocalPublicKey();
+            let partnerPub = chat.participant.publicKey || null;
+            let partnerId = chat.participant.userId || null;
+
+            if (!partnerPub || !partnerId) {
+                const row = await window.ZChatE2EE.fetchPublicKeyForUsername(chat.participant.name);
+                if (row) {
+                    partnerPub = row.public_key;
+                    partnerId = row.id;
+                    chat.participant.publicKey = partnerPub;
+                    chat.participant.userId = partnerId;
+                }
+            }
+
+            if (myPub && partnerPub) {
+                const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
+                safetyEl.textContent = num || "—";
+            } else {
+                safetyEl.textContent = "Keys not ready";
+            }
+
+            if (partnerId && window.ZChatE2EE.hasVerifiedUser) {
+                const already = await window.ZChatE2EE.hasVerifiedUser(partnerId);
+                if (already) {
+                    if (statusEl) {
+                        statusEl.textContent = "✓ Identity verified";
+                        statusEl.classList.remove("hidden");
+                    }
+                    if (verifyBtn) {
+                        verifyBtn.textContent = "Verified";
+                        verifyBtn.disabled = true;
+                        verifyBtn.style.opacity = "0.6";
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("[E2EE] refreshContactSecurityUI:", err);
+            safetyEl.textContent = "Error loading";
+        }
+    }
+
     function openInfoDrawer() {
         infoDrawer.classList.remove("hidden");
         icons();
+        const chat = state.chats.find((c) => c.id === state.activeChatId);
+        refreshContactSecurityUI(chat);
     }
     function closeInfoDrawer() {
         infoDrawer.classList.add("hidden");
@@ -1854,6 +1922,71 @@ function getVerifiedBadge(isVerified) {
 
     openInfoBtn.addEventListener("click", openInfoDrawer);
     closeInfoBtn.addEventListener("click", closeInfoDrawer);
+
+    // Copy Safety Number
+    const copySafetyNumberBtn = document.getElementById("copySafetyNumberBtn");
+    if (copySafetyNumberBtn) {
+        copySafetyNumberBtn.addEventListener("click", async () => {
+            const el = document.getElementById("safetyNumberValue");
+            const text = el ? el.textContent.trim() : "";
+            if (!text || text === "—" || text === "…") return;
+            try {
+                await navigator.clipboard.writeText(text);
+                const prev = copySafetyNumberBtn.textContent;
+                copySafetyNumberBtn.textContent = "Copied!";
+                setTimeout(() => { copySafetyNumberBtn.textContent = prev; }, 1500);
+            } catch (_) {}
+        });
+    }
+
+    // Mark as Verified
+    const markVerifiedBtn = document.getElementById("markVerifiedBtn");
+    if (markVerifiedBtn) {
+        markVerifiedBtn.addEventListener("click", async () => {
+            const chat = state.chats.find((c) => c.id === state.activeChatId);
+            if (!chat || !window.ZChatE2EE) return;
+
+            markVerifiedBtn.disabled = true;
+            markVerifiedBtn.textContent = "…";
+
+            try {
+                let partnerId = chat.participant.userId;
+                if (!partnerId) {
+                    const row = await window.ZChatE2EE.fetchPublicKeyForUsername(chat.participant.name);
+                    if (row) {
+                        partnerId = row.id;
+                        chat.participant.userId = row.id;
+                        chat.participant.publicKey = row.public_key;
+                    }
+                }
+                if (!partnerId) {
+                    markVerifiedBtn.textContent = "No ID";
+                    setTimeout(() => {
+                        markVerifiedBtn.textContent = "Verify";
+                        markVerifiedBtn.disabled = false;
+                    }, 1500);
+                    return;
+                }
+
+                await window.ZChatE2EE.markUserAsVerified(partnerId);
+                const statusEl = document.getElementById("markVerifiedStatus");
+                if (statusEl) {
+                    statusEl.textContent = "✓ Identity verified";
+                    statusEl.classList.remove("hidden");
+                }
+                markVerifiedBtn.textContent = "Verified";
+                markVerifiedBtn.style.opacity = "0.6";
+            } catch (err) {
+                console.error("[E2EE] mark verified:", err);
+                markVerifiedBtn.textContent = "Failed";
+                setTimeout(() => {
+                    markVerifiedBtn.textContent = "Verify";
+                    markVerifiedBtn.disabled = false;
+                    markVerifiedBtn.style.opacity = "1";
+                }, 1500);
+            }
+        });
+    }
 
     infoDrawer.addEventListener("click", (e) => {
         if (e.target === infoDrawer) {

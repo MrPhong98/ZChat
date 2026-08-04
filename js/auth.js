@@ -22,19 +22,20 @@ function saveSession(user, opts) {
     if (!user || !user.username) return;
     const isNewRegister = opts && opts.isNewRegister;
     clearLocalAvatar();
-    localStorage.removeItem("zchat_is_verified");
     if (!isNewRegister) {
-        // Đồng bộ avatar + verify từ tài khoản (login trên PC / điện thoại / trình duyệt khác)
+        // Đồng bộ avatar từ tài khoản (login trên PC / điện thoại / trình duyệt khác)
         if (user.avatar_type) localStorage.setItem("zchat_avatar_type", user.avatar_type);
         if (user.avatar_color) localStorage.setItem("zchat_avatar_color", user.avatar_color);
         if (user.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", user.avatar_emoji);
         if (user.avatar_url) localStorage.setItem("zchat_avatar_url", user.avatar_url);
-        if (user.is_verified) localStorage.setItem("zchat_is_verified", "1");
     }
     localStorage.setItem("zchat_username", user.username);
     if (user.recovery_password) {
         localStorage.setItem("zchat_recovery_password", user.recovery_password);
     }
+    if (user.public_key) localStorage.setItem("zchat_public_key", user.public_key);
+    if (user.private_key) localStorage.setItem("zchat_private_key", user.private_key);
+    if (user.id) localStorage.setItem("zchat_user_id", user.id);
     localStorage.setItem("zchat_user", JSON.stringify(user));
 }
 
@@ -107,15 +108,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const recoveryPassword = generateRecoveryPassword();
 
             try {
+                // Sinh cặp khóa RSA-OAEP trước khi tạo tài khoản
+                let public_key = null;
+                let private_key = null;
+                if (window.ZChatE2EE) {
+                    const pair = await window.ZChatE2EE.generateKeyPairJwk();
+                    public_key = pair.publicKey;
+                    private_key = pair.privateKey;
+                }
+
                 const { data, error } = await supabase
                     .from("users")
-                    .insert([{ username: username, recovery_password: recoveryPassword }])
+                    .insert([{
+                        username: username,
+                        recovery_password: recoveryPassword,
+                        public_key,
+                        private_key,
+                        verified_users: [],
+                    }])
                     .select()
                     .maybeSingle();
 
                 if (error) throw error;
 
-                const user = data || { username, recovery_password: recoveryPassword };
+                const user = data || { username, recovery_password: recoveryPassword, public_key, private_key };
                 saveSession(user, { isNewRegister: true });
 
                 if (recoveryPasswordDisplay) recoveryPasswordDisplay.textContent = recoveryPassword;
@@ -173,6 +189,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (loginError) loginError.classList.add("hidden");
                 saveSession(data);
+                // Bổ sung khóa nếu tài khoản cũ chưa có E2EE keys
+                if (window.ZChatE2EE) {
+                    try {
+                        await window.ZChatE2EE.ensureUserKeys(data.username, data);
+                    } catch (e2eeErr) {
+                        console.error("[E2EE] ensureUserKeys on login:", e2eeErr);
+                    }
+                }
                 enterChatApp(data.username);
             } catch (err) {
                 console.error("Lỗi Đăng nhập:", err);
