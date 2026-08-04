@@ -225,40 +225,60 @@
         }
     }
 
+    async function _loadVerifiedList(myUsername) {
+        const me = myUsername || localStorage.getItem("zchat_username") || "";
+        if (!global.supabaseClient || !me) return { me, list: [] };
+        const { data, error } = await global.supabaseClient
+            .from("users").select("id, username, verified_users")
+            .ilike("username", me).maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("Current user not found");
+        const list = Array.isArray(data.verified_users) ? data.verified_users.map(String) : [];
+        return { me, list, row: data };
+    }
+
     async function markUserAsVerified(targetUserId, myUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const me = myUsername || localStorage.getItem("zchat_username") || "";
-        if (!me) throw new Error("Not logged in");
-        const { data: meRow, error: fetchErr } = await global.supabaseClient
-            .from("users").select("id, username, verified_users")
-            .ilike("username", me).maybeSingle();
-        if (fetchErr) throw fetchErr;
-        if (!meRow) throw new Error("Current user not found");
-        const current = Array.isArray(meRow.verified_users) ? meRow.verified_users.slice() : [];
+        const { me, list } = await _loadVerifiedList(myUsername);
         const tid = String(targetUserId);
-        if (!current.includes(tid)) current.push(tid);
+        if (!list.includes(tid)) list.push(tid);
         const { data, error } = await global.supabaseClient
-            .from("users").update({ verified_users: current })
+            .from("users").update({ verified_users: list })
             .ilike("username", me).select("verified_users").maybeSingle();
         if (error) throw error;
-        return data && data.verified_users ? data.verified_users : current;
+        return data && data.verified_users ? data.verified_users : list;
+    }
+
+    /** Gỡ targetUserId khỏi verified_users */
+    async function unmarkUserAsVerified(targetUserId, myUsername) {
+        if (!global.supabaseClient) throw new Error("Supabase client missing");
+        if (!targetUserId) throw new Error("targetUserId required");
+        const { me, list } = await _loadVerifiedList(myUsername);
+        const tid = String(targetUserId);
+        const next = list.filter((id) => id !== tid);
+        const { data, error } = await global.supabaseClient
+            .from("users").update({ verified_users: next })
+            .ilike("username", me).select("verified_users").maybeSingle();
+        if (error) throw error;
+        return data && data.verified_users ? data.verified_users : next;
     }
 
     async function hasVerifiedUser(targetUserId, myUsername) {
         if (!global.supabaseClient || !targetUserId) return false;
-        const me = myUsername || localStorage.getItem("zchat_username") || "";
-        if (!me) return false;
-        const { data } = await global.supabaseClient
-            .from("users").select("verified_users")
-            .ilike("username", me).maybeSingle();
-        return ((data && data.verified_users) || []).map(String).includes(String(targetUserId));
+        try {
+            const { list } = await _loadVerifiedList(myUsername);
+            return list.includes(String(targetUserId));
+        } catch {
+            return false;
+        }
     }
 
     global.ZChatE2EE = {
         generateKeyPairJwk, ensureUserKeys, fetchPublicKeyForUsername,
         encryptMessage, encryptMessageForUsers, decryptMessage, safeDecryptContent,
-        decryptMessagesBatch, generateSafetyNumber, markUserAsVerified, hasVerifiedUser,
+        decryptMessagesBatch, generateSafetyNumber,
+        markUserAsVerified, unmarkUserAsVerified, hasVerifiedUser,
         getLocalPrivateKey, getLocalPublicKey, cacheKeysLocally, looksLikeE2eePayload,
     };
     console.log("[E2EE] ZChatE2EE ready");
