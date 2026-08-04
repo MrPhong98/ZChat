@@ -326,9 +326,8 @@ select.custom-select {
     flex-shrink: 0;
     display: block !important;
     color: #3b82f6;
-    /* đáy tick ngang đáy chữ; nhích nhẹ lên nếu font có khoảng thừa */
     position: relative;
-    top: -2px;
+    top: 0; /* xuống 2px so với bản -2px */
     margin: 0 !important;
     vertical-align: baseline;
 }
