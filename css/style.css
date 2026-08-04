@@ -321,8 +321,8 @@ select.custom-select {
     min-width: 0;
 }
 .verified-badge {
-    width: 16px !important;
-    height: 16px !important;
+    width: 15px !important;
+    height: 15px !important;
     flex-shrink: 0;
     display: block !important;
     color: #3b82f6;
