@@ -114,21 +114,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     public_key = pair.publicKey;
                     private_key = pair.privateKey;
                 }
-
                 const { data, error } = await supabase
                     .from("users")
-                    .insert([{
-                        username: username,
-                        recovery_password: recoveryPassword,
-                        public_key,
-                        private_key,
-                        verified_users: [],
-                    }])
+                    .insert([{ username, recovery_password: recoveryPassword, public_key, private_key, verified_users: [] }])
                     .select()
                     .maybeSingle();
-
                 if (error) throw error;
-
                 const user = data || { username, recovery_password: recoveryPassword, public_key, private_key };
                 saveSession(user, { isNewRegister: true });
 

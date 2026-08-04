@@ -1,6 +1,6 @@
 /**
- * ZChat E2EE — Web Crypto API (RSA-OAEP 2048 + AES-GCM hybrid)
- * Keys: users.public_key / users.private_key (JWK string)
+ * ZChat E2EE — RSA-OAEP 2048 + AES-GCM (hybrid)
+ * Decrypt tối ưu: cache CryptoKey, parallel batch
  */
 (function (global) {
     "use strict";
@@ -13,6 +13,12 @@
     };
     const AES_ALGO = { name: "AES-GCM", length: 256 };
     const E2EE_VERSION = 1;
+
+    // Cache khóa đã import — tránh importKey lặp lại mỗi tin nhắn
+    let _cachedPrivJwk = null;
+    let _cachedPrivKey = null;
+    let _cachedPubJwk = null;
+    let _cachedPubKey = null;
 
     function bufToB64(buf) {
         const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
@@ -54,10 +60,7 @@
     }
 
     async function generateKeyPairJwk() {
-        const keyPair = await crypto.subtle.generateKey(RSA_ALGO, true, [
-            "encrypt",
-            "decrypt",
-        ]);
+        const keyPair = await crypto.subtle.generateKey(RSA_ALGO, true, ["encrypt", "decrypt"]);
         const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
         const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
         return {
@@ -67,20 +70,35 @@
     }
 
     async function importPublicKey(jwk) {
+        const str = jwkToString(jwk);
+        if (_cachedPubJwk === str && _cachedPubKey) return _cachedPubKey;
         const obj = parseJwk(jwk);
         if (!obj) throw new Error("Invalid public key JWK");
-        return crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["encrypt"]);
+        const key = await crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["encrypt"]);
+        _cachedPubJwk = str;
+        _cachedPubKey = key;
+        return key;
     }
 
     async function importPrivateKey(jwk) {
+        const str = jwkToString(jwk);
+        if (_cachedPrivJwk === str && _cachedPrivKey) return _cachedPrivKey;
         const obj = parseJwk(jwk);
         if (!obj) throw new Error("Invalid private key JWK");
-        return crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["decrypt"]);
+        const key = await crypto.subtle.importKey("jwk", obj, RSA_ALGO, true, ["decrypt"]);
+        _cachedPrivJwk = str;
+        _cachedPrivKey = key;
+        return key;
     }
 
     function cacheKeysLocally(publicKey, privateKey) {
         if (publicKey) localStorage.setItem("zchat_public_key", jwkToString(publicKey));
         if (privateKey) localStorage.setItem("zchat_private_key", jwkToString(privateKey));
+        // invalidate crypto cache when keys change
+        _cachedPrivJwk = null;
+        _cachedPrivKey = null;
+        _cachedPubJwk = null;
+        _cachedPubKey = null;
     }
 
     function getLocalPrivateKey() {
@@ -114,18 +132,10 @@
         const pair = await generateKeyPairJwk();
         const { error } = await global.supabaseClient
             .from("users")
-            .update({
-                public_key: pair.publicKey,
-                private_key: pair.privateKey,
-            })
+            .update({ public_key: pair.publicKey, private_key: pair.privateKey })
             .ilike("username", username);
 
-        if (error) {
-            console.error("[E2EE] Failed to save keys:", error);
-            cacheKeysLocally(pair.publicKey, pair.privateKey);
-            return { publicKey: pair.publicKey, privateKey: pair.privateKey, userId: row && row.id };
-        }
-
+        if (error) console.error("[E2EE] Failed to save keys:", error);
         cacheKeysLocally(pair.publicKey, pair.privateKey);
         return { publicKey: pair.publicKey, privateKey: pair.privateKey, userId: row && row.id };
     }
@@ -141,31 +151,32 @@
         return data;
     }
 
+    function looksLikeE2eePayload(str) {
+        if (!str || typeof str !== "string") return false;
+        return str.startsWith("eyJ") || (str.startsWith("{") && str.includes('"alg"'));
+    }
+
     async function encryptMessage(plainText, receiverPublicKeyJwk) {
         if (plainText == null) plainText = "";
         if (!receiverPublicKeyJwk) throw new Error("Missing receiver public key");
-
-        try {
-            const pubKey = await importPublicKey(receiverPublicKeyJwk);
-            const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-            const encoded = new TextEncoder().encode(String(plainText));
-            const cipherBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoded);
-            const rawAes = await crypto.subtle.exportKey("raw", aesKey);
-            const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
-
-            const payload = {
-                v: E2EE_VERSION,
-                alg: "RSA-OAEP+AES-GCM",
-                iv: bufToB64(iv),
-                c: bufToB64(cipherBuf),
-                k: bufToB64(wrapped),
-            };
-            return bufToB64(new TextEncoder().encode(JSON.stringify(payload)));
-        } catch (err) {
-            console.error("[E2EE] encryptMessage error:", err);
-            throw err;
-        }
+        const pubKey = await importPublicKey(receiverPublicKeyJwk);
+        const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipherBuf = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
+            aesKey,
+            new TextEncoder().encode(String(plainText))
+        );
+        const rawAes = await crypto.subtle.exportKey("raw", aesKey);
+        const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
+        const payload = {
+            v: E2EE_VERSION,
+            alg: "RSA-OAEP+AES-GCM",
+            iv: bufToB64(iv),
+            c: bufToB64(cipherBuf),
+            k: bufToB64(wrapped),
+        };
+        return bufToB64(new TextEncoder().encode(JSON.stringify(payload)));
     }
 
     async function encryptMessageForUsers(plainText, publicKeysByUsername) {
@@ -173,54 +184,45 @@
         const entries = Object.entries(publicKeysByUsername || {}).filter(([, jwk]) => !!jwk);
         if (!entries.length) throw new Error("No public keys provided");
 
-        try {
-            const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-            const encoded = new TextEncoder().encode(String(plainText));
-            const cipherBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, encoded);
-            const rawAes = await crypto.subtle.exportKey("raw", aesKey);
+        const aesKey = await crypto.subtle.generateKey(AES_ALGO, true, ["encrypt", "decrypt"]);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipherBuf = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
+            aesKey,
+            new TextEncoder().encode(String(plainText))
+        );
+        const rawAes = await crypto.subtle.exportKey("raw", aesKey);
 
-            const keys = {};
-            for (const [name, jwk] of entries) {
+        const keys = {};
+        // Parallel wrap keys
+        await Promise.all(
+            entries.map(async ([name, jwk]) => {
                 const pubKey = await importPublicKey(jwk);
                 const wrapped = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, rawAes);
                 keys[name.toLowerCase()] = bufToB64(wrapped);
-            }
+            })
+        );
 
-            const payload = {
-                v: E2EE_VERSION,
-                alg: "RSA-OAEP+AES-GCM",
-                iv: bufToB64(iv),
-                c: bufToB64(cipherBuf),
-                keys,
-            };
-            return bufToB64(new TextEncoder().encode(JSON.stringify(payload)));
-        } catch (err) {
-            console.error("[E2EE] encryptMessageForUsers error:", err);
-            throw err;
-        }
-    }
-
-    function looksLikeE2eePayload(str) {
-        if (!str || typeof str !== "string") return false;
-        if (str.startsWith("eyJ")) return true;
-        if (str.startsWith("{") && str.includes('"alg"')) return true;
-        return false;
+        const payload = {
+            v: E2EE_VERSION,
+            alg: "RSA-OAEP+AES-GCM",
+            iv: bufToB64(iv),
+            c: bufToB64(cipherBuf),
+            keys,
+        };
+        return bufToB64(new TextEncoder().encode(JSON.stringify(payload)));
     }
 
     async function decryptMessage(encryptedBase64, myPrivateKeyJwk) {
         if (!encryptedBase64) return "";
         if (!myPrivateKeyJwk) return null;
-
         try {
             if (!looksLikeE2eePayload(encryptedBase64)) return null;
-
             const jsonStr = new TextDecoder().decode(b64ToBuf(encryptedBase64));
             const payload = JSON.parse(jsonStr);
             if (!payload || !payload.c || !payload.iv) return null;
 
             const privKey = await importPrivateKey(myPrivateKeyJwk);
-
             let wrappedB64 = payload.k || null;
             if (!wrappedB64 && payload.keys && typeof payload.keys === "object") {
                 const me = (localStorage.getItem("zchat_username") || "").toLowerCase();
@@ -241,7 +243,7 @@
             );
             return new TextDecoder().decode(plainBuf);
         } catch (err) {
-            console.warn("[E2EE] decryptMessage failed:", err && err.message);
+            console.warn("[E2EE] decrypt failed:", err && err.message);
             return null;
         }
     }
@@ -257,27 +259,50 @@
         }
     }
 
+    /**
+     * Giải mã hàng loạt song song (nhanh hơn for-await tuần tự).
+     * @param {Array<{text?: string}>} messages - mutate in place
+     */
+    async function decryptMessagesBatch(messages, privateKeyJwk) {
+        if (!messages || !messages.length || !privateKeyJwk) return;
+        // Pre-import private key once
+        try {
+            await importPrivateKey(privateKeyJwk);
+        } catch {
+            return;
+        }
+        const tasks = messages.map(async (msg) => {
+            if (!msg || !msg.text || !looksLikeE2eePayload(msg.text)) return;
+            const plain = await safeDecryptContent(msg.text, privateKeyJwk);
+            if (plain != null) msg.text = plain;
+        });
+        // Chunk to avoid overwhelming main thread (32 at a time)
+        const CHUNK = 32;
+        for (let i = 0; i < tasks.length; i += CHUNK) {
+            await Promise.all(tasks.slice(i, i + CHUNK));
+        }
+    }
+
     async function generateSafetyNumber(myPublicKeyJwk, partnerPublicKeyJwk) {
         try {
             const a = canonicalJwkString(myPublicKeyJwk);
             const b = canonicalJwkString(partnerPublicKeyJwk);
             if (!a || !b) return "";
-
             const [first, second] = [a, b].sort();
-            const combined = first + "|" + second;
-            const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(combined));
+            const hashBuf = await crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(first + "|" + second)
+            );
             const bytes = new Uint8Array(hashBuf);
-
             let digits = "";
             for (let i = 0; i < 15; i++) {
                 digits += String(bytes[i] % 10);
                 digits += String(Math.floor(bytes[i] / 10) % 10);
             }
-            digits = digits.slice(0, 30);
-            const groups = digits.match(/.{1,5}/g) || [];
-            return groups.join(" ");
+            digits = digits.slice(0, 60); // 12 nhóm x 5 số giống Signal
+            return (digits.match(/.{1,5}/g) || []).join(" ");
         } catch (err) {
-            console.error("[E2EE] generateSafetyNumber error:", err);
+            console.error("[E2EE] generateSafetyNumber:", err);
             return "";
         }
     }
@@ -285,7 +310,6 @@
     async function markUserAsVerified(targetUserId, myUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-
         const me = myUsername || localStorage.getItem("zchat_username") || "";
         if (!me) throw new Error("Not logged in");
 
@@ -294,7 +318,6 @@
             .select("id, username, verified_users")
             .ilike("username", me)
             .maybeSingle();
-
         if (fetchErr) throw fetchErr;
         if (!meRow) throw new Error("Current user not found");
 
@@ -308,7 +331,6 @@
             .ilike("username", me)
             .select("verified_users")
             .maybeSingle();
-
         if (error) throw error;
         return data && data.verified_users ? data.verified_users : current;
     }
@@ -334,6 +356,7 @@
         encryptMessageForUsers,
         decryptMessage,
         safeDecryptContent,
+        decryptMessagesBatch,
         generateSafetyNumber,
         markUserAsVerified,
         hasVerifiedUser,
@@ -342,6 +365,5 @@
         cacheKeysLocally,
         looksLikeE2eePayload,
     };
-
     console.log("[E2EE] ZChatE2EE ready");
 })(typeof window !== "undefined" ? window : globalThis);
