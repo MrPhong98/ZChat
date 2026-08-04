@@ -184,12 +184,31 @@
     }
 
     /* ============ GUARD: no account yet ============ */
-    // accountUsername: username hiện tại trên server (đổi được sau khi rename)
     let accountUsername = localStorage.getItem("zchat_username");
-    const savedUsername = accountUsername; // giữ alias cho code cũ
+    const savedUsername = accountUsername;
     if (!accountUsername) {
         window.location.href = "index.html";
         return;
+    }
+
+    /** Viết lại chat_id khi username đổi (chat_old_other → chat_new_other) */
+    function rewriteChatId(chatId, oldName, newName) {
+        if (!chatId || !oldName || !newName) return chatId;
+        const o = oldName.toLowerCase();
+        const n = newName.toLowerCase();
+        if (chatId.toLowerCase() === `saved_${o}`) return `saved_${n}`;
+        if (!chatId.toLowerCase().startsWith("chat_")) return chatId;
+        const rest = chatId.slice(5);
+        let other = null;
+        if (rest.toLowerCase().startsWith(o + "_")) {
+            other = rest.slice(o.length + 1);
+        } else if (rest.toLowerCase().endsWith("_" + o)) {
+            other = rest.slice(0, -(o.length + 1));
+        } else {
+            return chatId;
+        }
+        const sorted = [n, other.toLowerCase()].sort();
+        return `chat_${sorted[0]}_${sorted[1]}`;
     }
 
     /* ============ LOAD SAVED STATE (local trước, rồi đồng bộ từ tài khoản Supabase) ============ */
@@ -520,7 +539,7 @@
         }
         usernameError.classList.add("hidden");
 
-        // Preference local (không phải identity)
+        // Preference chỉ lưu local
         localStorage.setItem("zchat_bio", bioField.value.trim() || "Available");
         localStorage.setItem("zchat_presence", draft.presence);
         localStorage.setItem("zchat_avatar_type", draft.avatarType);
@@ -529,7 +548,6 @@
         localStorage.setItem("zchat_avatar_url", draft.avatarUrl || "");
         localStorage.setItem("zchat_theme", draft.theme);
 
-        // Username + avatar phải lưu trên Supabase để đồng bộ mọi thiết bị
         if (!window.supabaseClient) {
             usernameError.textContent = "Can't connect to server. Please try again.";
             usernameError.classList.remove("hidden");
@@ -542,10 +560,9 @@
                 avatarUrlToSave = avatarUrlToSave.split("?")[0];
             }
 
-            const accountKey = accountUsername || localStorage.getItem("zchat_username") || name;
+            const accountKey = accountUsername || name;
             const nameChanged = name.toLowerCase() !== String(accountKey).toLowerCase();
 
-            // Nếu đổi tên: kiểm tra trùng trước
             if (nameChanged) {
                 const { data: existing, error: checkErr } = await window.supabaseClient
                     .from("users")
@@ -561,19 +578,18 @@
                 }
             }
 
-            const updatePayload = {
-                username: name,
-                avatar_type: draft.avatarType,
-                avatar_color: draft.avatarColor || null,
-                avatar_emoji: draft.avatarEmoji || null,
-                avatar_url: avatarUrlToSave,
-            };
-
+            // 1) Cập nhật tài khoản (username + avatar) trên Supabase
             const { data: updatedRows, error } = await window.supabaseClient
                 .from("users")
-                .update(updatePayload)
+                .update({
+                    username: name,
+                    avatar_type: draft.avatarType,
+                    avatar_color: draft.avatarColor || null,
+                    avatar_emoji: draft.avatarEmoji || null,
+                    avatar_url: avatarUrlToSave,
+                })
                 .ilike("username", accountKey)
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified");
+                .select("username");
 
             if (error) {
                 const raw = `${error.code || ""} ${error.message || ""}`;
@@ -586,14 +602,51 @@
                 console.error("[ZChat] Update profile error:", error);
                 return;
             }
-
             if (!updatedRows || updatedRows.length === 0) {
                 usernameError.textContent = "Account not found on server. Please log in again.";
                 usernameError.classList.remove("hidden");
                 return;
             }
 
-            // Chỉ cập nhật local sau khi server OK
+            // 2) Nếu đổi tên → cập nhật tin nhắn + chat_id để bên kia thấy tên mới
+            if (nameChanged) {
+                try {
+                    // Đổi sender_username trên mọi tin mình đã gửi
+                    await window.supabaseClient
+                        .from("messages")
+                        .update({ sender_username: name })
+                        .ilike("sender_username", accountKey);
+
+                    // Đổi chat_id còn chứa username cũ
+                    const oldL = accountKey.toLowerCase();
+                    const { data: msgRows } = await window.supabaseClient
+                        .from("messages")
+                        .select("id, chat_id")
+                        .or(
+                            `chat_id.eq.saved_${oldL},chat_id.ilike.chat_${oldL}_%,chat_id.ilike.chat_%_${oldL}`
+                        );
+
+                    if (msgRows && msgRows.length) {
+                        const updates = [];
+                        for (const m of msgRows) {
+                            const nextId = rewriteChatId(m.chat_id, accountKey, name);
+                            if (nextId && nextId !== m.chat_id) {
+                                updates.push(
+                                    window.supabaseClient
+                                        .from("messages")
+                                        .update({ chat_id: nextId })
+                                        .eq("id", m.id)
+                                );
+                            }
+                        }
+                        if (updates.length) await Promise.all(updates);
+                    }
+                } catch (syncErr) {
+                    console.error("[ZChat] Sync messages after rename error:", syncErr);
+                }
+            }
+
+            // 3) Local chỉ sau khi server OK
             localStorage.setItem("zchat_username", name);
             accountUsername = name;
             if (avatarUrlToSave) {
@@ -613,15 +666,11 @@
             } catch (_) {}
 
             saved.username = name;
-
             const lang = localStorage.getItem("zchat_lang") || "en";
             const dict = i18n[lang] || i18n.en;
             showToast(dict.successToast);
-            renderUsernamePreview();
-            renderAvatarPreview();
-            if (typeof renderVerifiedBadge === "function") {
-                renderVerifiedBadge(localStorage.getItem("zchat_is_verified") === "1");
-            }
+            if (typeof renderUsernamePreview === "function") renderUsernamePreview();
+            if (typeof renderAvatarPreview === "function") renderAvatarPreview();
         } catch (err) {
             console.error("[ZChat] Save profile exception:", err);
             usernameError.textContent = "Server connection error. Please try again.";
