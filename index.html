@@ -736,39 +736,48 @@
 </div>
 
 
-<!-- ============ SAFETY NUMBER MODAL (Signal-style) ============ -->
-<div id="safetyNumberModal" class="hidden fixed inset-0 z-[75] flex flex-col" style="background-color: #0a0a0a; color: #fff;">
-    <div class="flex items-center gap-3 px-4 pt-5 pb-3 shrink-0">
-        <button type="button" id="closeSafetyNumberBtn" class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/10" aria-label="Back">
-            <i data-lucide="arrow-left" class="w-5 h-5"></i>
-        </button>
-        <h2 class="flex-1 text-center font-display text-base font-semibold pr-10">Safety number</h2>
-    </div>
-
-    <div class="flex-1 overflow-y-auto flex flex-col items-center px-6 pt-6 pb-4">
-        <div class="w-full max-w-xs rounded-3xl p-5 flex flex-col items-center gap-5"
-             style="background-color: #161616; border: 1px solid rgba(255,255,255,0.08);">
-            <div id="safetyQrWrap" class="flex items-center justify-center rounded-2xl p-3" style="background:#0a0a0a;">
-                <canvas id="safetyQrCanvas" width="200" height="200"></canvas>
-            </div>
-            <div id="safetyNumberGrid"
-                 class="w-full font-mono text-[13px] sm:text-[14px] tracking-wider text-center leading-7 text-white/90 select-all"
-                 style="font-variant-numeric: tabular-nums;">
-                …
-            </div>
+<!-- ============ SAFETY NUMBER POPUP ============ -->
+<div id="safetyNumberModal" class="hidden fixed inset-0 z-[75] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm fade-in">
+    <div class="w-full max-w-sm rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+         style="background-color: var(--surface); border: 1px solid var(--transparent-border); color: var(--ink);">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 pt-5 pb-2">
+            <h3 class="font-display text-base font-bold">Safety number</h3>
+            <button type="button" id="closeSafetyNumberBtn"
+                    class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                    style="color: var(--muted);" aria-label="Close">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
         </div>
-        <p id="safetyNumberHint" class="mt-8 text-center text-[13px] leading-relaxed max-w-sm" style="color: #737373;">
-            To verify end-to-end encryption, compare numbers above with their device.
-        </p>
-        <p id="safetyNumberError" class="hidden mt-4 text-center text-xs text-red-400"></p>
-    </div>
 
-    <div class="shrink-0 px-5 pb-8 pt-3">
-        <button type="button" id="safetyMarkVerifiedBtn"
-                class="w-full rounded-full py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-                style="background-color: #f4f4f5; color: #09090b;">
-            Mark as verified
-        </button>
+        <!-- Body -->
+        <div class="px-5 pb-4 flex flex-col items-center gap-4">
+            <div class="w-full rounded-2xl p-4 flex flex-col items-center gap-4"
+                 style="background-color: var(--elevated); border: 1px solid var(--transparent-border);">
+                <div id="safetyQrWrap" class="relative flex items-center justify-center rounded-2xl p-2"
+                     style="background-color: #0a0a0a;">
+                    <canvas id="safetyQrCanvas" width="200" height="200"></canvas>
+                </div>
+                <div id="safetyNumberGrid"
+                     class="w-full font-mono text-[12.5px] tracking-wider text-center leading-7 select-all"
+                     style="font-variant-numeric: tabular-nums; color: var(--ink);">
+                    …
+                </div>
+            </div>
+            <p id="safetyNumberHint" class="text-center text-[12px] leading-relaxed" style="color: var(--muted);">
+                To verify end-to-end encryption, compare numbers above with their device.
+            </p>
+            <p id="safetyNumberError" class="hidden text-center text-xs text-red-400"></p>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-5 pb-5">
+            <button type="button" id="safetyMarkVerifiedBtn"
+                    class="w-full rounded-full py-3 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                    style="background-color: var(--ink); color: var(--canvas);">
+                Mark as verified
+            </button>
+        </div>
     </div>
 </div>
 
