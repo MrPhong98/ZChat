@@ -7,9 +7,31 @@ if (typeof window.supabaseClient === "undefined") {
 }
 var supabase = window.supabaseClient;
 
+/** Xóa avatar local — tránh account mới dính ảnh account cũ */
+function clearLocalAvatar() {
+    [
+        "zchat_avatar_type",
+        "zchat_avatar_color",
+        "zchat_avatar_emoji",
+        "zchat_avatar_url",
+    ].forEach((k) => localStorage.removeItem(k));
+}
+
 /** Lưu session đồng bộ cho index / settings / profile */
-function saveSession(user) {
+function saveSession(user, opts) {
     if (!user || !user.username) return;
+    const isNewRegister = opts && opts.isNewRegister;
+    if (isNewRegister) {
+        clearLocalAvatar();
+    } else if (user.avatar_type || user.avatar_url || user.avatar_emoji || user.avatar_color) {
+        clearLocalAvatar();
+        if (user.avatar_type) localStorage.setItem("zchat_avatar_type", user.avatar_type);
+        if (user.avatar_color) localStorage.setItem("zchat_avatar_color", user.avatar_color);
+        if (user.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", user.avatar_emoji);
+        if (user.avatar_url) localStorage.setItem("zchat_avatar_url", user.avatar_url);
+    } else {
+        clearLocalAvatar();
+    }
     localStorage.setItem("zchat_username", user.username);
     if (user.recovery_password) {
         localStorage.setItem("zchat_recovery_password", user.recovery_password);
@@ -84,58 +106,32 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("usernameError")?.classList.add("hidden");
 
             const recoveryPassword = generateRecoveryPassword();
-            const errEl = document.getElementById("usernameError");
 
             try {
-                // Check trùng username trước (không phân biệt hoa/thường)
-                const { data: existing, error: checkErr } = await supabase
-                    .from("users")
-                    .select("username")
-                    .ilike("username", username)
-                    .maybeSingle();
-
-                if (checkErr) throw checkErr;
-
-                if (existing) {
-                    if (errEl) {
-                        errEl.textContent = "Username already taken. Please choose another.";
-                        errEl.classList.remove("hidden");
-                    }
-                    return;
-                }
-
                 const { data, error } = await supabase
                     .from("users")
                     .insert([{ username: username, recovery_password: recoveryPassword }])
                     .select()
                     .maybeSingle();
 
-                if (error) {
-                    // Phòng race condition / constraint 23505
-                    const msg = (error.message || "") + (error.code || "");
-                    if (
-                        error.code === "23505" ||
-                        /duplicate key|unique constraint|users_username/i.test(msg)
-                    ) {
-                        if (errEl) {
-                            errEl.textContent = "Username already taken. Please choose another.";
-                            errEl.classList.remove("hidden");
-                        }
-                        return;
-                    }
-                    throw error;
-                }
+                if (error) throw error;
 
                 const user = data || { username, recovery_password: recoveryPassword };
-                saveSession(user);
+                saveSession(user, { isNewRegister: true });
 
                 if (recoveryPasswordDisplay) recoveryPasswordDisplay.textContent = recoveryPassword;
                 if (recoveryModal) recoveryModal.classList.remove("hidden");
             } catch (err) {
                 console.error("Lỗi Đăng ký:", err);
-                if (errEl) {
-                    errEl.textContent = "Registration failed. Please try again.";
-                    errEl.classList.remove("hidden");
+                const loginError = document.getElementById("usernameError");
+                if (loginError) {
+                    const raw = `${err.code || ""} ${err.message || ""}`;
+                    if (/23505|duplicate key|unique constraint|users_username/i.test(raw)) {
+                        loginError.textContent = "Username already taken. Please choose another.";
+                    } else {
+                        loginError.textContent = "Registration failed. Please try again.";
+                    }
+                    loginError.classList.remove("hidden");
                 }
             }
         }, true); // capture so it runs before main.js handler
@@ -207,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const wrapper = document.getElementById("copyIconWrapper") || copyRecoveryBtn;
             const originalHTML = wrapper.innerHTML;
             wrapper.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b98e0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
             `;
