@@ -1,0 +1,107 @@
+<!--
+  Dán khối này vào index.html, ngay trước </body> (trước các thẻ <script>).
+  CSS: copy phần <style> vào css/style.css hoặc để inline.
+-->
+
+<!-- ============ VIDEO CALL MODAL (Z-Chat) ============ -->
+<div id="zcCallModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center">
+    <!-- Backdrop blur -->
+    <div class="absolute inset-0 bg-black/70" style="backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);"></div>
+
+    <div class="relative z-10 w-full max-w-md mx-4 flex flex-col items-center">
+
+        <!-- OUTGOING: Đang đổ chuông -->
+        <div id="zcOutgoingPanel" class="hidden w-full rounded-3xl p-8 flex flex-col items-center gap-6 shadow-2xl"
+             style="background-color: var(--surface); border: 1px solid var(--transparent-border, rgba(255,255,255,0.12)); color: var(--ink);">
+            <div id="zcCallPeerAvatar" class="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold select-none"
+                 style="background-color: var(--elevated); color: var(--ink);">?</div>
+            <div class="text-center space-y-1">
+                <p id="zcCallPeerName" class="font-display text-xl font-extrabold">User</p>
+                <p id="zcCallStatus" class="text-sm" style="color: var(--muted);">Đang đổ chuông...</p>
+            </div>
+            <button type="button" id="zcBtnCancel"
+                    class="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition-opacity hover:opacity-90"
+                    aria-label="Tắt máy">
+                <i data-lucide="phone-off" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <!-- INCOMING: Cuộc gọi đến -->
+        <div id="zcIncomingPanel" class="hidden w-full rounded-3xl p-8 flex flex-col items-center gap-6 shadow-2xl"
+             style="background-color: var(--surface); border: 1px solid var(--transparent-border, rgba(255,255,255,0.12)); color: var(--ink);">
+            <div class="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold select-none zc-incoming-avatar"
+                 style="background-color: var(--elevated); color: var(--ink);">?</div>
+            <div class="text-center space-y-1">
+                <p class="font-display text-xl font-extrabold zc-incoming-name">User</p>
+                <p class="text-sm" style="color: var(--muted);">Cuộc gọi video đến</p>
+            </div>
+            <div class="flex items-center gap-6">
+                <button type="button" id="zcBtnReject"
+                        class="flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg transition-opacity hover:opacity-90"
+                        aria-label="Từ chối">
+                    <i data-lucide="phone-off" class="w-6 h-6"></i>
+                </button>
+                <button type="button" id="zcBtnAccept"
+                        class="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg transition-opacity hover:opacity-90"
+                        aria-label="Nghe">
+                    <i data-lucide="phone" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- IN-CALL: WebRTC stage -->
+        <div id="zcInCallPanel" class="hidden fixed inset-0 z-[81] flex flex-col"
+             style="background-color: #000;">
+            <!-- Remote full -->
+            <video id="zcRemoteVideo" class="absolute inset-0 h-full w-full object-cover" autoplay playsinline></video>
+
+            <!-- Local PIP -->
+            <video id="zcLocalVideo"
+                   class="absolute bottom-28 right-4 h-36 w-28 sm:h-44 sm:w-32 rounded-2xl object-cover shadow-2xl border"
+                   style="border-color: rgba(255,255,255,0.2); background:#111;"
+                   autoplay playsinline muted></video>
+
+            <!-- Top peer label -->
+            <div class="relative z-10 flex items-center justify-center pt-10 px-4">
+                <div class="rounded-full px-4 py-1.5 text-sm font-semibold text-white/90"
+                     style="background: rgba(0,0,0,0.45); backdrop-filter: blur(8px);">
+                    <span class="zc-incall-name">User</span>
+                    <span class="opacity-70 mx-1">·</span>
+                    <span class="zc-incall-status opacity-80">Đang gọi</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="relative z-10 mt-auto mb-10 flex items-center justify-center gap-5">
+                <button type="button" id="zcBtnMute"
+                        class="zc-call-ctrl flex h-14 w-14 items-center justify-center rounded-full text-white transition-colors"
+                        style="background: rgba(40,40,40,0.85);" aria-label="Mute">
+                    <i data-lucide="mic" class="w-5 h-5"></i>
+                </button>
+                <button type="button" id="zcBtnHangup"
+                        class="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 text-white shadow-xl transition-opacity hover:opacity-90"
+                        aria-label="Kết thúc">
+                    <i data-lucide="phone-off" class="w-7 h-7"></i>
+                </button>
+                <button type="button" id="zcBtnCam"
+                        class="zc-call-ctrl flex h-14 w-14 items-center justify-center rounded-full text-white transition-colors"
+                        style="background: rgba(40,40,40,0.85);" aria-label="Camera">
+                    <i data-lucide="video" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Video call extras — có thể chuyển vào style.css */
+    .zc-call-btn-off {
+        background: #ef4444 !important;
+    }
+    #zcCallModal:not(.hidden) {
+        animation: fade-in .18s ease-out;
+    }
+    #zcLocalVideo {
+        z-index: 5;
+    }
+</style>
