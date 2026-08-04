@@ -84,15 +84,47 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("usernameError")?.classList.add("hidden");
 
             const recoveryPassword = generateRecoveryPassword();
+            const errEl = document.getElementById("usernameError");
 
             try {
+                // Check trùng username trước (không phân biệt hoa/thường)
+                const { data: existing, error: checkErr } = await supabase
+                    .from("users")
+                    .select("username")
+                    .ilike("username", username)
+                    .maybeSingle();
+
+                if (checkErr) throw checkErr;
+
+                if (existing) {
+                    if (errEl) {
+                        errEl.textContent = "Username already taken. Please choose another.";
+                        errEl.classList.remove("hidden");
+                    }
+                    return;
+                }
+
                 const { data, error } = await supabase
                     .from("users")
                     .insert([{ username: username, recovery_password: recoveryPassword }])
                     .select()
                     .maybeSingle();
 
-                if (error) throw error;
+                if (error) {
+                    // Phòng race condition / constraint 23505
+                    const msg = (error.message || "") + (error.code || "");
+                    if (
+                        error.code === "23505" ||
+                        /duplicate key|unique constraint|users_username/i.test(msg)
+                    ) {
+                        if (errEl) {
+                            errEl.textContent = "Username already taken. Please choose another.";
+                            errEl.classList.remove("hidden");
+                        }
+                        return;
+                    }
+                    throw error;
+                }
 
                 const user = data || { username, recovery_password: recoveryPassword };
                 saveSession(user);
@@ -101,10 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (recoveryModal) recoveryModal.classList.remove("hidden");
             } catch (err) {
                 console.error("Lỗi Đăng ký:", err);
-                const loginError = document.getElementById("usernameError");
-                if (loginError) {
-                    loginError.textContent = err.message || "Registration failed (username may already exist)";
-                    loginError.classList.remove("hidden");
+                if (errEl) {
+                    errEl.textContent = "Registration failed. Please try again.";
+                    errEl.classList.remove("hidden");
                 }
             }
         }, true); // capture so it runs before main.js handler
@@ -176,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const wrapper = document.getElementById("copyIconWrapper") || copyRecoveryBtn;
             const originalHTML = wrapper.innerHTML;
             wrapper.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1b98e0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
             `;
