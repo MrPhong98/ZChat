@@ -204,31 +204,17 @@
 
     const draft = Object.assign({}, saved);
 
-    /** Ghi avatar lên bảng users (đồng bộ mọi thiết bị + realtime cho người chat cùng) */
-    async function syncAvatarToAccount(fields) {
-        if (!window.supabaseClient) return false;
-        const accountKey = savedUsername || draft.username || localStorage.getItem("zchat_username");
-        if (!accountKey) return false;
-        try {
-            localStorage.setItem("zchat_avatar_type", fields.avatar_type || "initials");
-            if (fields.avatar_color) localStorage.setItem("zchat_avatar_color", fields.avatar_color);
-            if (fields.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", fields.avatar_emoji);
-            if (fields.avatar_url) localStorage.setItem("zchat_avatar_url", fields.avatar_url);
-            else if (fields.avatar_type !== "photo") localStorage.removeItem("zchat_avatar_url");
+    function getVerifiedBadgeSvg(isVerified) {
+        if (!isVerified) return "";
+        return `<svg class="inline-block flex-shrink-0 text-blue-500" width="14" height="14" viewBox="0 0 22 22" fill="currentColor" style="margin-left:2px;vertical-align:-2px" title="Verified"><path d="M 20.396 11 c -0.018 -0.646 -0.215 -1.275 -0.57 -1.816 c -0.354 -0.54 -0.852 -0.972 -1.438 -1.246 c 0.223 -0.607 0.27 -1.264 0.14 -1.897 c -0.131 -0.634 -0.437 -1.218 -0.882 -1.687 c -0.47 -0.445 -1.053 -0.75 -1.687 -0.882 c -0.633 -0.13 -1.29 -0.083 -1.897 0.14 c -0.273 -0.587 -0.704 -1.086 -1.245 -1.44 S 11.647 1.62 11 1.604 c -0.646 0.017 -1.273 0.213 -1.813 0.568 s -0.969 0.854 -1.24 1.44 c -0.608 -0.223 -1.267 -0.272 -1.902 -0.14 c -0.635 0.13 -1.22 0.436 -1.69 0.882 c -0.445 0.47 -0.749 1.055 -0.878 1.688 c -0.13 0.633 -0.08 1.29 0.144 1.896 c -0.587 0.274 -1.087 0.705 -1.443 1.245 c -0.356 0.54 -0.555 1.17 -0.574 1.817 c 0.02 0.647 0.218 1.276 0.574 1.817 c 0.356 0.54 0.856 0.972 1.443 1.245 c -0.224 0.606 -0.274 1.263 -0.144 1.896 c 0.13 0.634 0.433 1.218 0.877 1.688 c 0.47 0.443 1.054 0.747 1.687 0.878 c 0.633 0.132 1.29 0.084 1.897 -0.136 c 0.274 0.586 0.705 1.084 1.246 1.439 c 0.54 0.354 1.17 0.551 1.816 0.569 c 0.647 -0.016 1.276 -0.213 1.817 -0.567 s 0.972 -0.854 1.245 -1.44 c 0.604 0.239 1.266 0.296 1.903 0.164 c 0.636 -0.132 1.22 -0.447 1.68 -0.907 c 0.46 -0.46 0.776 -1.044 0.908 -1.681 s 0.075 -1.299 -0.165 -1.903 c 0.586 -0.274 1.084 -0.705 1.439 -1.246 c 0.354 -0.54 0.551 -1.17 0.569 -1.816 Z M 9.662 14.85 l -3.429 -3.428 l 1.293 -1.302 l 2.072 2.072 l 4.4 -4.794 l 1.347 1.246 Z"/></svg>`;
+    }
 
-            const { error } = await window.supabaseClient
-                .from("users")
-                .update(fields)
-                .ilike("username", accountKey);
-            if (error) {
-                console.error("[ZChat] syncAvatarToAccount error:", error);
-                return false;
-            }
-            return true;
-        } catch (err) {
-            console.error("[ZChat] syncAvatarToAccount exception:", err);
-            return false;
-        }
+    function renderVerifiedBadge(isVerified) {
+        const preview = document.getElementById("usernamePreview");
+        if (!preview) return;
+        const field = document.getElementById("usernameField");
+        const name = (field && field.value.trim()) || savedUsername || "";
+        preview.innerHTML = "@" + name.toLowerCase().replace(/\s+/g, "") + getVerifiedBadgeSvg(isVerified);
     }
 
     /** Avatar gắn với tài khoản — fetch từ server để đồng bộ mọi thiết bị */
@@ -237,7 +223,7 @@
         try {
             const { data, error } = await window.supabaseClient
                 .from("users")
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
                 .ilike("username", savedUsername)
                 .maybeSingle();
             if (error || !data) return;
@@ -258,7 +244,10 @@
                 draft.avatarUrl = saved.avatarUrl = data.avatar_url;
                 localStorage.setItem("zchat_avatar_url", data.avatar_url);
             }
+            if (data.is_verified) localStorage.setItem("zchat_is_verified", "1");
+            else localStorage.removeItem("zchat_is_verified");
             if (typeof renderAvatarPreview === "function") renderAvatarPreview();
+            renderVerifiedBadge(!!data.is_verified);
         } catch (err) {
             console.error("[ZChat] loadAvatarFromAccount error:", err);
         }
@@ -341,16 +330,8 @@
             btn.addEventListener("click", () => {
                 draft.avatarType = "initials";
                 draft.avatarColor = btn.dataset.color;
-                draft.avatarUrl = "";
                 renderAvatarPreview();
                 avatarPopover.classList.add("hidden");
-                // Đồng bộ màu avatar lên tài khoản ngay
-                syncAvatarToAccount({
-                    avatar_type: "initials",
-                    avatar_color: draft.avatarColor,
-                    avatar_emoji: null,
-                    avatar_url: null,
-                });
             });
         });
     }
@@ -365,16 +346,8 @@
             btn.addEventListener("click", () => {
                 draft.avatarType = "emoji";
                 draft.avatarEmoji = btn.dataset.emoji;
-                draft.avatarUrl = "";
                 renderAvatarPreview();
                 avatarPopover.classList.add("hidden");
-                // Đồng bộ emoji avatar lên tài khoản ngay
-                syncAvatarToAccount({
-                    avatar_type: "emoji",
-                    avatar_color: null,
-                    avatar_emoji: draft.avatarEmoji,
-                    avatar_url: null,
-                });
             });
         });
     }
@@ -514,17 +487,6 @@
                 draft.avatarUrl = `${publicUrl}?t=${Date.now()}`;
                 renderAvatarPreview();
                 avatarPopover.classList.add("hidden");
-
-                // Ghi ngay vào bảng users → thiết bị khác / user khác thấy ảnh mới (realtime)
-                const ok = await syncAvatarToAccount({
-                    avatar_type: "photo",
-                    avatar_url: publicUrl,
-                    avatar_color: null,
-                    avatar_emoji: null,
-                });
-                if (!ok) {
-                    setUploadError("Photo uploaded but not synced to account. Press Save Changes.");
-                }
             } catch (err) {
                 console.error("[ZChat] Avatar upload error:", err);
                 setUploadError(err.message || "Upload failed. Please try again.");
@@ -623,6 +585,8 @@
     });
 
     icons();
-    // Đồng bộ avatar từ tài khoản (sau khi DOM/render sẵn sàng)
     loadAvatarFromAccount();
+    if (localStorage.getItem("zchat_is_verified") === "1") {
+        renderVerifiedBadge(true);
+    }
 })();
