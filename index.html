@@ -519,43 +519,18 @@
                         <div class="w-full rounded-2xl p-4 space-y-4"
                              style="background-color: var(--canvas); border: 1px solid var(--hairline);">
 
-                            <!-- Safety Number (E2EE) -->
-                            <div id="safetyNumberSection" class="space-y-2">
-                                <div class="flex items-center gap-3">
-                                    <i data-lucide="shield-check" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
-                                    <div class="min-w-0 flex-1">
-                                        <p id="safetyNumberTitle" class="text-xs font-bold" style="color: var(--ink);">Safety Number</p>
-                                        <p id="safetyNumberDesc" class="text-[11px]" style="color: var(--muted);">Compare with contact to prevent MITM</p>
-                                    </div>
-                                </div>
-                                <div class="rounded-xl px-3 py-2.5 font-mono text-[12px] leading-relaxed tracking-wide select-all break-all"
-                                     style="background-color: var(--elevated); color: var(--ink); border: 1px solid var(--transparent-border);"
-                                     id="safetyNumberValue">—</div>
-                                <button type="button" id="copySafetyNumberBtn"
-                                        class="w-full rounded-xl px-3 py-2 text-xs font-semibold transition-colors hover:opacity-90"
-                                        style="background-color: var(--elevated); color: var(--ink); border: 1px solid var(--transparent-border);">
-                                    Copy Safety Number
-                                </button>
-                            </div>
-
-                            <div style="border-top: 1px solid var(--hairline);"></div>
-
-                            <!-- Mark as Verified (E2EE) -->
-                            <div class="flex items-center justify-between gap-3">
+                            <!-- Safety Number entry -->
+                            <button type="button" id="openSafetyNumberBtn"
+                                    class="w-full flex items-center justify-between gap-3 text-left transition-opacity hover:opacity-80">
                                 <div class="flex items-center gap-3 min-w-0">
-                                    <i data-lucide="badge-check" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
+                                    <i data-lucide="shield-check" class="w-5 h-5 shrink-0" style="color: var(--muted);"></i>
                                     <div class="min-w-0">
-                                        <p id="markVerifiedTitle" class="text-xs font-bold" style="color: var(--ink);">Mark as Verified</p>
-                                        <p id="markVerifiedDesc" class="text-[11px]" style="color: var(--muted);">Confirm identity after comparing numbers</p>
+                                        <p class="text-xs font-bold" style="color: var(--ink);">Safety Number</p>
+                                        <p id="safetyNumberPreview" class="text-[11px] truncate" style="color: var(--muted);">Tap to verify encryption</p>
                                     </div>
                                 </div>
-                                <button type="button" id="markVerifiedBtn"
-                                        class="shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
-                                        style="background-color: #1b98e0; color: #fff;">
-                                    Verify
-                                </button>
-                            </div>
-                            <p id="markVerifiedStatus" class="hidden text-[11px] font-medium px-1" style="color: #31D07C;"></p>
+                                <i data-lucide="chevron-right" class="w-4 h-4 shrink-0" style="color: var(--faint);"></i>
+                            </button>
 
                             <div style="border-top: 1px solid var(--hairline);"></div>
 
@@ -760,11 +735,49 @@
     </div>
 </div>
 
+
+<!-- ============ SAFETY NUMBER MODAL (Signal-style) ============ -->
+<div id="safetyNumberModal" class="hidden fixed inset-0 z-[75] flex flex-col" style="background-color: #0a0a0a; color: #fff;">
+    <div class="flex items-center gap-3 px-4 pt-5 pb-3 shrink-0">
+        <button type="button" id="closeSafetyNumberBtn" class="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-white/10" aria-label="Back">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h2 class="flex-1 text-center font-display text-base font-semibold pr-10">Safety number</h2>
+    </div>
+
+    <div class="flex-1 overflow-y-auto flex flex-col items-center px-6 pt-6 pb-4">
+        <div class="w-full max-w-xs rounded-3xl p-5 flex flex-col items-center gap-5"
+             style="background-color: #161616; border: 1px solid rgba(255,255,255,0.08);">
+            <div id="safetyQrWrap" class="flex items-center justify-center rounded-2xl p-3" style="background:#0a0a0a;">
+                <canvas id="safetyQrCanvas" width="200" height="200"></canvas>
+            </div>
+            <div id="safetyNumberGrid"
+                 class="w-full font-mono text-[13px] sm:text-[14px] tracking-wider text-center leading-7 text-white/90 select-all"
+                 style="font-variant-numeric: tabular-nums;">
+                …
+            </div>
+        </div>
+        <p id="safetyNumberHint" class="mt-8 text-center text-[13px] leading-relaxed max-w-sm" style="color: #737373;">
+            To verify end-to-end encryption, compare numbers above with their device.
+        </p>
+        <p id="safetyNumberError" class="hidden mt-4 text-center text-xs text-red-400"></p>
+    </div>
+
+    <div class="shrink-0 px-5 pb-8 pt-3">
+        <button type="button" id="safetyMarkVerifiedBtn"
+                class="w-full rounded-full py-3.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+                style="background-color: #f4f4f5; color: #09090b;">
+            Mark as verified
+        </button>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
     window.ZCHAT_SIGNAL_URL = localStorage.getItem("zchat_signal_url") || "https://zchat-backend-call.onrender.com";
 </script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="js/e2ee.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
