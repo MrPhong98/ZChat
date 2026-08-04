@@ -22,12 +22,14 @@ function saveSession(user, opts) {
     if (!user || !user.username) return;
     const isNewRegister = opts && opts.isNewRegister;
     clearLocalAvatar();
+    localStorage.removeItem("zchat_is_verified");
     if (!isNewRegister) {
-        // Đồng bộ avatar từ tài khoản (login trên PC / điện thoại / trình duyệt khác)
+        // Đồng bộ avatar + verify từ tài khoản (login trên PC / điện thoại / trình duyệt khác)
         if (user.avatar_type) localStorage.setItem("zchat_avatar_type", user.avatar_type);
         if (user.avatar_color) localStorage.setItem("zchat_avatar_color", user.avatar_color);
         if (user.avatar_emoji) localStorage.setItem("zchat_avatar_emoji", user.avatar_emoji);
         if (user.avatar_url) localStorage.setItem("zchat_avatar_url", user.avatar_url);
+        if (user.is_verified) localStorage.setItem("zchat_is_verified", "1");
     }
     localStorage.setItem("zchat_username", user.username);
     if (user.recovery_password) {
