@@ -764,11 +764,11 @@
             <div class="w-full rounded-2xl p-4 flex flex-col items-center gap-4"
                  style="background-color: var(--elevated); border: 1px solid var(--transparent-border);">
                 <div id="safetyQrWrap" class="relative flex items-center justify-center"
-                     style="width:220px;height:220px;padding:14px;background:#0a0a0a;border-radius:20px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;">
-                    <canvas id="safetyQrCanvas" width="192" height="192" class="block" style="border-radius:8px;"></canvas>
+                     style="width:220px;height:220px;padding:12px;background:#0a0a0a;border-radius:20px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;">
+                    <canvas id="safetyQrCanvas" width="196" height="196" class="block" style="width:196px;height:196px;border-radius:8px;"></canvas>
                     <div id="safetyQrLogo" class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-xl"
-                         style="width:48px;height:48px;background:#0a0a0a;">
-                        <svg width="34" height="34" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                         style="width:44px;height:44px;background:#0a0a0a;">
+                        <svg width="30" height="30" viewBox="0 0 100 100" fill="none" aria-hidden="true">
                             <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
                                   fill="#ffffff" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
                         </svg>
@@ -805,8 +805,6 @@
         </div>
     </div>
 </div>
-
-
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
