@@ -748,27 +748,16 @@
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
-
-        <div class="px-5 pb-3">
-            <div class="flex rounded-full p-1" style="background-color: var(--elevated);">
-                <button type="button" id="safetyTabMyCode"
-                        class="safety-tab flex-1 rounded-full py-2 text-xs font-semibold transition-colors"
-                        style="background-color: var(--ink); color: var(--canvas);">My Code</button>
-                <button type="button" id="safetyTabScan"
-                        class="safety-tab flex-1 rounded-full py-2 text-xs font-semibold transition-colors"
-                        style="background-color: transparent; color: var(--muted);">Scan Code</button>
-            </div>
-        </div>
-
-        <div id="safetyPanelMyCode" class="px-5 pb-4 flex flex-col items-center gap-4">
+        <div class="px-5 pb-4 flex flex-col items-center gap-4">
             <div class="w-full rounded-2xl p-4 flex flex-col items-center gap-4"
                  style="background-color: var(--elevated); border: 1px solid var(--transparent-border);">
                 <div id="safetyQrWrap" class="relative flex items-center justify-center"
-                     style="width:220px;height:220px;padding:12px;background:#0a0a0a;border-radius:20px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;">
-                    <canvas id="safetyQrCanvas" width="196" height="196" class="block" style="width:196px;height:196px;border-radius:8px;"></canvas>
+                     style="width:220px;height:220px;padding:14px;background:#0a0a0a;border-radius:20px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;">
+                    <canvas id="safetyQrCanvas" width="192" height="192" class="block" style="border-radius:8px;"></canvas>
+                    <img id="safetyQrImg" alt="" class="hidden absolute object-contain" style="width:192px;height:192px;left:50%;top:50%;transform:translate(-50%,-50%);" />
                     <div id="safetyQrLogo" class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-xl"
-                         style="width:44px;height:44px;background:#0a0a0a;">
-                        <svg width="30" height="30" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                         style="width:48px;height:48px;background:#0a0a0a;">
+                        <svg width="34" height="34" viewBox="0 0 100 100" fill="none" aria-hidden="true">
                             <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
                                   fill="#ffffff" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
                         </svg>
@@ -782,26 +771,13 @@
                 To verify end-to-end encryption, compare numbers above with their device.
             </p>
             <p id="safetyNumberError" class="hidden text-center text-xs text-red-400"></p>
+        </div>
+        <div class="px-5 pb-5">
             <button type="button" id="safetyMarkVerifiedBtn"
                     class="w-full rounded-full py-3 text-sm font-semibold transition-opacity hover:opacity-90"
                     style="background-color: var(--ink); color: var(--canvas);">
                 Mark as verified
             </button>
-        </div>
-
-        <div id="safetyPanelScan" class="hidden px-5 pb-5 flex flex-col items-center gap-4">
-            <div class="w-full rounded-2xl overflow-hidden relative"
-                 style="background-color: #0a0a0a; border: 1px solid rgba(255,255,255,0.1); aspect-ratio: 1; max-width: 280px;">
-                <video id="safetyScanVideo" class="absolute inset-0 w-full h-full object-cover" playsinline muted></video>
-                <canvas id="safetyScanCanvas" class="hidden"></canvas>
-                <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div style="width:70%;height:70%;border:2px solid rgba(255,255,255,0.55);border-radius:16px;"></div>
-                </div>
-            </div>
-            <p id="safetyScanHint" class="text-center text-[12px] leading-relaxed" style="color: var(--muted);">
-                Point the camera at their QR code to compare safety numbers.
-            </p>
-            <p id="safetyScanResult" class="hidden text-center text-xs font-semibold"></p>
         </div>
     </div>
 </div>
@@ -812,6 +788,7 @@
     window.ZCHAT_SIGNAL_URL = localStorage.getItem("zchat_signal_url") || "https://zchat-backend-call.onrender.com";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="js/e2ee.js"></script>
 <script src="js/auth.js"></script>
