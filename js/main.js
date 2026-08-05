@@ -1940,6 +1940,15 @@ function getVerifiedBadge(isVerified) {
         }
     }
 
+    function unmirrorScanPreview() {
+        const root = document.getElementById("safetyScanReader");
+        if (!root) return;
+        root.querySelectorAll("video, canvas").forEach((el) => {
+            el.style.transform = "none";
+            el.style.webkitTransform = "none";
+        });
+    }
+
     async function stopSafetyScanner() {
         _scanRunning = false;
         if (_html5Qr) {
@@ -1975,7 +1984,6 @@ function getVerifiedBadge(isVerified) {
         } else {
             resultEl.textContent = "No match — numbers differ (possible MITM)";
             resultEl.style.color = "#f87171";
-            console.log("[E2EE] mismatch", scanned.slice(0, 48), mine.slice(0, 48));
         }
     }
 
@@ -2008,7 +2016,8 @@ function getVerifiedBadge(isVerified) {
                 return { width: s, height: s };
             },
             aspectRatio: 1,
-            disableFlip: false,
+            // không lật khung hình khi decode
+            disableFlip: true,
         };
 
         const onSuccess = (decodedText) => {
@@ -2021,15 +2030,19 @@ function getVerifiedBadge(isVerified) {
             const cameras = await Html5Qrcode.getCameras();
             let cameraIdOrConfig = { facingMode: "environment" };
             if (cameras && cameras.length) {
-                // prefer back camera if label hints
                 const back = cameras.find((c) => /back|rear|environment/i.test(c.label || ""));
                 cameraIdOrConfig = (back || cameras[cameras.length - 1]).id;
             }
             await _html5Qr.start(cameraIdOrConfig, config, onSuccess, () => {});
+            // bỏ mirror nếu browser/lib tự gắn
+            setTimeout(unmirrorScanPreview, 100);
+            setTimeout(unmirrorScanPreview, 500);
         } catch (err1) {
             console.warn("[E2EE] env camera failed, try user:", err1);
             try {
                 await _html5Qr.start({ facingMode: "user" }, config, onSuccess, () => {});
+                setTimeout(unmirrorScanPreview, 100);
+                setTimeout(unmirrorScanPreview, 500);
             } catch (err2) {
                 console.warn("[E2EE] scanner start failed:", err2);
                 if (resultEl) {
@@ -2053,7 +2066,6 @@ function getVerifiedBadge(isVerified) {
                 }
                 return;
             }
-            // stop live camera first
             await stopSafetyScanner();
             const reader = document.getElementById("safetyScanReader");
             if (reader) reader.innerHTML = "";
