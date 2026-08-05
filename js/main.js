@@ -1909,46 +1909,65 @@ function getVerifiedBadge(isVerified) {
         else startSafetyScanner();
     }
 
-    /** QR: dots + rounded finder eyes */
+    /**
+     * Vẽ QR: ưu tiên toCanvas (luôn hiện), rồi cố style dots + rounded eyes.
+     * Nếu style lỗi vẫn giữ bản toCanvas.
+     */
     async function renderSafetyQr(payload) {
         const canvas = document.getElementById("safetyQrCanvas");
         const data = String(payload || "").replace(/\s+/g, "");
-        if (!canvas || !data) return;
-        const size = 192;
+        if (!canvas || !data) {
+            console.warn("[E2EE] renderSafetyQr: missing canvas or data", !!canvas, data && data.length);
+            return;
+        }
+        const size = 196;
         canvas.width = size;
         canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#0a0a0a";
-        ctx.fillRect(0, 0, size, size);
+        canvas.style.width = size + "px";
+        canvas.style.height = size + "px";
+        canvas.classList.remove("hidden");
 
-        if (typeof QRCode === "undefined" || typeof QRCode.create !== "function") {
-            if (typeof QRCode !== "undefined" && QRCode.toCanvas) {
-                try {
-                    await QRCode.toCanvas(canvas, data, {
-                        width: size, margin: 3, errorCorrectionLevel: "H",
-                        color: { dark: "#ffffff", light: "#0a0a0a" },
-                    });
-                } catch (e) { console.warn("[E2EE] QR fallback:", e); }
-            }
+        if (typeof QRCode === "undefined") {
+            console.warn("[E2EE] QRCode library not loaded");
             return;
         }
 
+        // 1) Always draw a working QR first
+        try {
+            await QRCode.toCanvas(canvas, data, {
+                width: size,
+                margin: 2,
+                errorCorrectionLevel: "H",
+                color: { dark: "#ffffff", light: "#0a0a0a" },
+            });
+        } catch (e) {
+            console.warn("[E2EE] toCanvas failed:", e);
+            return;
+        }
+
+        // 2) Try overlay styled version (dots + rounded eyes)
+        if (typeof QRCode.create !== "function") return;
         try {
             const qr = QRCode.create(data, { errorCorrectionLevel: "H" });
             const mods = qr.modules;
+            if (!mods || !mods.size) return;
             const n = mods.size;
             const marginMods = 2;
             const total = n + marginMods * 2;
             const cell = size / total;
             const offset = marginMods * cell;
-            const dark = "#ffffff";
+            const ctx = canvas.getContext("2d");
 
+            function on(r, c) {
+                if (typeof mods.get === "function") return !!mods.get(r, c);
+                if (mods.data) return mods.data[r * n + c] === 1;
+                return false;
+            }
             function isFinder(r, c) {
                 return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
             }
-
-            function drawRoundedRect(x, y, w, h, r) {
-                const rr = Math.min(r, w / 2, h / 2);
+            function roundRect(x, y, w, h, rad) {
+                const rr = Math.min(rad, w / 2, h / 2);
                 ctx.beginPath();
                 ctx.moveTo(x + rr, y);
                 ctx.arcTo(x + w, y, x + w, y + h, rr);
@@ -1958,34 +1977,44 @@ function getVerifiedBadge(isVerified) {
                 ctx.closePath();
                 ctx.fill();
             }
-
-            function drawFinder(row0, col0) {
-                const x = offset + col0 * cell;
-                const y = offset + row0 * cell;
-                ctx.fillStyle = dark;
-                drawRoundedRect(x, y, 7 * cell, 7 * cell, cell * 1.4);
+            function finder(r0, c0) {
+                const x = offset + c0 * cell, y = offset + r0 * cell;
+                ctx.fillStyle = "#ffffff";
+                roundRect(x, y, 7 * cell, 7 * cell, cell * 1.3);
                 ctx.fillStyle = "#0a0a0a";
-                drawRoundedRect(x + cell, y + cell, 5 * cell, 5 * cell, cell * 1.0);
-                ctx.fillStyle = dark;
-                drawRoundedRect(x + 2 * cell, y + 2 * cell, 3 * cell, 3 * cell, cell * 0.85);
+                roundRect(x + cell, y + cell, 5 * cell, 5 * cell, cell * 0.9);
+                ctx.fillStyle = "#ffffff";
+                roundRect(x + 2 * cell, y + 2 * cell, 3 * cell, 3 * cell, cell * 0.75);
             }
 
-            ctx.fillStyle = dark;
+            // clear & redraw styled
+            ctx.fillStyle = "#0a0a0a";
+            ctx.fillRect(0, 0, size, size);
+            let painted = 0;
+            ctx.fillStyle = "#ffffff";
             for (let r = 0; r < n; r++) {
                 for (let c = 0; c < n; c++) {
-                    if (!mods.get(r, c) || isFinder(r, c)) continue;
-                    const cx = offset + (c + 0.5) * cell;
-                    const cy = offset + (r + 0.5) * cell;
+                    if (!on(r, c) || isFinder(r, c)) continue;
                     ctx.beginPath();
-                    ctx.arc(cx, cy, cell * 0.38, 0, Math.PI * 2);
+                    ctx.arc(offset + (c + 0.5) * cell, offset + (r + 0.5) * cell, cell * 0.36, 0, Math.PI * 2);
                     ctx.fill();
+                    painted++;
                 }
             }
-            drawFinder(0, 0);
-            drawFinder(0, n - 7);
-            drawFinder(n - 7, 0);
+            finder(0, 0);
+            finder(0, n - 7);
+            finder(n - 7, 0);
+
+            // if nothing painted, restore square QR
+            if (painted < 10) {
+                await QRCode.toCanvas(canvas, data, {
+                    width: size, margin: 2, errorCorrectionLevel: "H",
+                    color: { dark: "#ffffff", light: "#0a0a0a" },
+                });
+            }
         } catch (e) {
-            console.warn("[E2EE] styled QR failed:", e);
+            console.warn("[E2EE] styled QR skipped:", e);
+            // square QR already drawn
         }
     }
 
@@ -2022,7 +2051,6 @@ function getVerifiedBadge(isVerified) {
             }
             return;
         }
-
         const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
         const tick = () => {
             if (!_scanStream) return;
