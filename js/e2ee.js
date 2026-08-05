@@ -225,40 +225,53 @@
         }
     }
 
-    /** Lấy UUID của user hiện tại (verifier) */
-    async function _resolveMyUserId(myUsername) {
+    /** Lấy UUID + username của user hiện tại (verifier) */
+    async function _resolveMyUser(myUsername) {
         const me = myUsername || localStorage.getItem("zchat_username") || "";
-        const cached = localStorage.getItem("zchat_user_id");
-        if (cached) return { me, myId: cached };
+        const cachedId = localStorage.getItem("zchat_user_id");
+        if (cachedId && me) return { me, myId: cachedId };
         if (!global.supabaseClient || !me) return { me, myId: null };
         const { data, error } = await global.supabaseClient
-            .from("users").select("id")
+            .from("users").select("id, username")
             .ilike("username", me).maybeSingle();
         if (error) throw error;
         if (!data || !data.id) throw new Error("Current user not found");
         localStorage.setItem("zchat_user_id", data.id);
-        return { me, myId: data.id };
+        return { me: data.username || me, myId: data.id };
+    }
+
+    /** Lấy username từ UUID (partner được verify) */
+    async function _resolveUsernameById(userId) {
+        if (!global.supabaseClient || !userId) return null;
+        const { data } = await global.supabaseClient
+            .from("users").select("username")
+            .eq("id", userId).maybeSingle();
+        return data && data.username ? data.username : null;
     }
 
     /**
      * Bảng verified_contacts:
-     *   verifier_id       uuid  — người bấm Mark as verified
-     *   verified_user_id  uuid  — người được xác nhận
-     *   created_at        timestamptz
+     *   verifier_id, verified_user_id, verifier_username, verified_username, created_at
      */
-    async function markUserAsVerified(targetUserId, myUsername) {
+    async function markUserAsVerified(targetUserId, myUsername, partnerUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const { myId } = await _resolveMyUserId(myUsername);
+        const { me, myId } = await _resolveMyUser(myUsername);
         if (!myId) throw new Error("Current user id missing");
         const tid = String(targetUserId);
-        // upsert — không tạo trùng nếu đã verify
+        let verifiedName = partnerUsername || null;
+        if (!verifiedName) {
+            verifiedName = await _resolveUsernameById(tid);
+        }
+        const row = {
+            verifier_id: myId,
+            verified_user_id: tid,
+            verifier_username: me || null,
+            verified_username: verifiedName || null,
+        };
         const { data, error } = await global.supabaseClient
             .from("verified_contacts")
-            .upsert(
-                { verifier_id: myId, verified_user_id: tid },
-                { onConflict: "verifier_id,verified_user_id" }
-            )
+            .upsert(row, { onConflict: "verifier_id,verified_user_id" })
             .select()
             .maybeSingle();
         if (error) throw error;
@@ -269,7 +282,7 @@
     async function unmarkUserAsVerified(targetUserId, myUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const { myId } = await _resolveMyUserId(myUsername);
+        const { myId } = await _resolveMyUser(myUsername);
         if (!myId) throw new Error("Current user id missing");
         const { error } = await global.supabaseClient
             .from("verified_contacts")
@@ -283,7 +296,7 @@
     async function hasVerifiedUser(targetUserId, myUsername) {
         if (!global.supabaseClient || !targetUserId) return false;
         try {
-            const { myId } = await _resolveMyUserId(myUsername);
+            const { myId } = await _resolveMyUser(myUsername);
             if (!myId) return false;
             const { data, error } = await global.supabaseClient
                 .from("verified_contacts")

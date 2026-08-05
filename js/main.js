@@ -2030,11 +2030,13 @@ function getVerifiedBadge(isVerified) {
             const wasVerified = _safetyIsVerified;
             safetyMarkVerifiedBtn.textContent = "…";
             try {
+                const chat = state.chats.find((c) => c.id === state.activeChatId);
+                const partnerName = chat && chat.participant ? chat.participant.name : null;
                 if (wasVerified) {
                     await window.ZChatE2EE.unmarkUserAsVerified(_safetyPartnerId);
                     setVerifyBtnLabel(false);
                 } else {
-                    await window.ZChatE2EE.markUserAsVerified(_safetyPartnerId);
+                    await window.ZChatE2EE.markUserAsVerified(_safetyPartnerId, null, partnerName);
                     setVerifyBtnLabel(true);
                 }
             } catch (err) {
