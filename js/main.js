@@ -988,9 +988,7 @@ function getVerifiedBadge(isVerified) {
         if (window.supabaseClient) {
             try {
                 const { error } = await window.supabaseClient
-                    .from("messages")
-                    .delete()
-                    .eq("chat_id", chatId);
+                    .rpc("clear_conversation", { p_chat_id: chatId });
                 if (error) console.error("[ZChat] clearConversation error:", error);
             } catch (err) {
                 console.error("[ZChat] clearConversation exception:", err);

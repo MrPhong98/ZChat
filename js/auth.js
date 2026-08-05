@@ -7,6 +7,27 @@ if (typeof window.supabaseClient === "undefined") {
 }
 var supabase = window.supabaseClient;
 
+/**
+ * Đảm bảo trình duyệt hiện tại có 1 phiên đăng nhập ẩn danh thật (auth.uid())
+ * từ Supabase Auth. Đây là điều kiện bắt buộc để các hàm RPC register_user /
+ * verify_login hoạt động (chúng cần auth.uid() để gắn thiết bị vào tài khoản).
+ * Supabase tự lưu session này (localStorage riêng của supabase-js), nên các
+ * lần load trang sau sẽ tự khôi phục lại, không tạo phiên mới liên tục.
+ */
+async function ensureAnonSession() {
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) return session;
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        return data.session;
+    } catch (err) {
+        console.error("[Auth] Không thể tạo phiên ẩn danh:", err);
+        return null;
+    }
+}
+window.zchatEnsureAnonSession = ensureAnonSession;
+
 /** Xóa avatar local — tránh account mới dính ảnh account cũ */
 function clearLocalAvatar() {
     [
@@ -54,7 +75,10 @@ function enterChatApp(username) {
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    // Bắt buộc phải có phiên ẩn danh trước khi cho phép đăng ký/đăng nhập
+    await ensureAnonSession();
+
     const onboardingForm = document.getElementById("onboardingForm");
     const loginForm = document.getElementById("loginForm");
     const usernameInput = document.getElementById("usernameInput");
@@ -108,6 +132,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const recoveryPassword = generateRecoveryPassword();
 
             try {
+                await ensureAnonSession(); // đảm bảo chắc chắn đã có session trước khi gọi RPC
+
                 let public_key = null, private_key = null;
                 if (window.ZChatE2EE) {
                     const pair = await window.ZChatE2EE.generateKeyPairJwk();
@@ -115,9 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     private_key = pair.privateKey;
                 }
                 const { data, error } = await supabase
-                    .from("users")
-                    .insert([{ username, recovery_password: recoveryPassword, public_key, private_key, verified_users: [] }])
-                    .select()
+                    .rpc("register_user", {
+                        p_username: username,
+                        p_recovery_password: recoveryPassword,
+                        p_public_key: public_key,
+                        p_private_key: private_key,
+                    })
                     .maybeSingle();
                 if (error) throw error;
                 const user = data || { username, recovery_password: recoveryPassword, public_key, private_key };
@@ -159,14 +188,22 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             try {
+                await ensureAnonSession();
+
                 const { data, error } = await supabase
-                    .from("users")
-                    .select("*")
-                    .eq("username", username)
-                    .eq("recovery_password", recoveryPassword)
+                    .rpc("verify_login", {
+                        p_username: username,
+                        p_recovery_password: recoveryPassword,
+                    })
                     .maybeSingle();
 
-                if (error) throw error;
+                if (error) {
+                    if (loginError) {
+                        loginError.textContent = "Invalid username or recovery password.";
+                        loginError.classList.remove("hidden");
+                    }
+                    return;
+                }
 
                 if (!data) {
                     if (loginError) {
