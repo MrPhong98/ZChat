@@ -225,50 +225,74 @@
         }
     }
 
-    async function _loadVerifiedList(myUsername) {
+    /** Lấy UUID của user hiện tại (verifier) */
+    async function _resolveMyUserId(myUsername) {
         const me = myUsername || localStorage.getItem("zchat_username") || "";
-        if (!global.supabaseClient || !me) return { me, list: [] };
+        const cached = localStorage.getItem("zchat_user_id");
+        if (cached) return { me, myId: cached };
+        if (!global.supabaseClient || !me) return { me, myId: null };
         const { data, error } = await global.supabaseClient
-            .from("users").select("id, username, verified_users")
+            .from("users").select("id")
             .ilike("username", me).maybeSingle();
         if (error) throw error;
-        if (!data) throw new Error("Current user not found");
-        const list = Array.isArray(data.verified_users) ? data.verified_users.map(String) : [];
-        return { me, list, row: data };
+        if (!data || !data.id) throw new Error("Current user not found");
+        localStorage.setItem("zchat_user_id", data.id);
+        return { me, myId: data.id };
     }
 
+    /**
+     * Bảng verified_contacts:
+     *   verifier_id       uuid  — người bấm Mark as verified
+     *   verified_user_id  uuid  — người được xác nhận
+     *   created_at        timestamptz
+     */
     async function markUserAsVerified(targetUserId, myUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const { me, list } = await _loadVerifiedList(myUsername);
+        const { myId } = await _resolveMyUserId(myUsername);
+        if (!myId) throw new Error("Current user id missing");
         const tid = String(targetUserId);
-        if (!list.includes(tid)) list.push(tid);
+        // upsert — không tạo trùng nếu đã verify
         const { data, error } = await global.supabaseClient
-            .from("users").update({ verified_users: list })
-            .ilike("username", me).select("verified_users").maybeSingle();
+            .from("verified_contacts")
+            .upsert(
+                { verifier_id: myId, verified_user_id: tid },
+                { onConflict: "verifier_id,verified_user_id" }
+            )
+            .select()
+            .maybeSingle();
         if (error) throw error;
-        return data && data.verified_users ? data.verified_users : list;
+        return data;
     }
 
-    /** Gỡ targetUserId khỏi verified_users */
+    /** Xóa dòng verify (Mark as unverified) */
     async function unmarkUserAsVerified(targetUserId, myUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const { me, list } = await _loadVerifiedList(myUsername);
-        const tid = String(targetUserId);
-        const next = list.filter((id) => id !== tid);
-        const { data, error } = await global.supabaseClient
-            .from("users").update({ verified_users: next })
-            .ilike("username", me).select("verified_users").maybeSingle();
+        const { myId } = await _resolveMyUserId(myUsername);
+        if (!myId) throw new Error("Current user id missing");
+        const { error } = await global.supabaseClient
+            .from("verified_contacts")
+            .delete()
+            .eq("verifier_id", myId)
+            .eq("verified_user_id", String(targetUserId));
         if (error) throw error;
-        return data && data.verified_users ? data.verified_users : next;
+        return true;
     }
 
     async function hasVerifiedUser(targetUserId, myUsername) {
         if (!global.supabaseClient || !targetUserId) return false;
         try {
-            const { list } = await _loadVerifiedList(myUsername);
-            return list.includes(String(targetUserId));
+            const { myId } = await _resolveMyUserId(myUsername);
+            if (!myId) return false;
+            const { data, error } = await global.supabaseClient
+                .from("verified_contacts")
+                .select("verifier_id")
+                .eq("verifier_id", myId)
+                .eq("verified_user_id", String(targetUserId))
+                .maybeSingle();
+            if (error) return false;
+            return !!data;
         } catch {
             return false;
         }
