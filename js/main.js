@@ -1886,7 +1886,10 @@ function getVerifiedBadge(isVerified) {
         return html;
     }
 
+    let _safetyQrStyling = null;
+
     async function renderSafetyQr(payload) {
+        const host = document.getElementById("safetyQrHost");
         const canvas = document.getElementById("safetyQrCanvas");
         const img = document.getElementById("safetyQrImg");
         const data = String(payload || "").replace(/\s+/g, "");
@@ -1896,105 +1899,75 @@ function getVerifiedBadge(isVerified) {
         }
         const size = 196;
 
-        // Resolve global (some builds expose differently)
-        const QR = (typeof QRCode !== "undefined" && QRCode)
-            || (typeof qrcode !== "undefined" && qrcode)
-            || (window && window.QRCode)
-            || null;
+        // Preferred: qr-code-styling → dots + rounded eyes
+        const Styling = window.QRCodeStyling || (typeof QRCodeStyling !== "undefined" ? QRCodeStyling : null);
+        if (Styling && host) {
+            try {
+                host.innerHTML = "";
+                if (canvas) canvas.classList.add("hidden");
+                if (img) img.classList.add("hidden");
+                host.classList.remove("hidden");
+                _safetyQrStyling = new Styling({
+                    width: size,
+                    height: size,
+                    type: "canvas",
+                    data: data,
+                    margin: 6,
+                    qrOptions: { errorCorrectionLevel: "H" },
+                    backgroundOptions: { color: "#0a0a0a" },
+                    dotsOptions: {
+                        type: "dots",
+                        color: "#ffffff",
+                    },
+                    cornersSquareOptions: {
+                        type: "extra-rounded",
+                        color: "#ffffff",
+                    },
+                    cornersDotOptions: {
+                        type: "dot",
+                        color: "#ffffff",
+                    },
+                    // keep center quiet for logo overlay
+                    imageOptions: {
+                        hideBackgroundDots: true,
+                        imageSize: 0.28,
+                        margin: 4,
+                    },
+                });
+                _safetyQrStyling.append(host);
+                return;
+            } catch (e) {
+                console.warn("[E2EE] QRCodeStyling failed:", e);
+            }
+        }
 
+        // Fallback: plain toCanvas
+        const QR = window.QRCode || (typeof QRCode !== "undefined" ? QRCode : null);
         if (canvas && QR && typeof QR.toCanvas === "function") {
             try {
-                canvas.width = size;
-                canvas.height = size;
-                canvas.style.width = size + "px";
-                canvas.style.height = size + "px";
+                if (host) host.innerHTML = "";
                 canvas.classList.remove("hidden");
                 if (img) img.classList.add("hidden");
+                canvas.width = size;
+                canvas.height = size;
                 await QR.toCanvas(canvas, data, {
                     width: size,
                     margin: 2,
                     errorCorrectionLevel: "H",
                     color: { dark: "#ffffff", light: "#0a0a0a" },
                 });
-                // optional styled redraw
-                if (typeof QR.create === "function") {
-                    try {
-                        const qr = QR.create(data, { errorCorrectionLevel: "H" });
-                        const mods = qr.modules;
-                        const n = mods && mods.size;
-                        if (n) {
-                            const marginMods = 2;
-                            const cell = size / (n + marginMods * 2);
-                            const offset = marginMods * cell;
-                            const ctx = canvas.getContext("2d");
-                            const on = (r, c) => (typeof mods.get === "function" ? !!mods.get(r, c) : mods.data && mods.data[r * n + c] === 1);
-                            const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
-                            const roundRect = (x, y, w, h, rad) => {
-                                const rr = Math.min(rad, w / 2, h / 2);
-                                ctx.beginPath();
-                                ctx.moveTo(x + rr, y);
-                                ctx.arcTo(x + w, y, x + w, y + h, rr);
-                                ctx.arcTo(x + w, y + h, x, y + h, rr);
-                                ctx.arcTo(x, y + h, x, y, rr);
-                                ctx.arcTo(x, y, x + w, y, rr);
-                                ctx.closePath();
-                                ctx.fill();
-                            };
-                            const finder = (r0, c0) => {
-                                const x = offset + c0 * cell, y = offset + r0 * cell;
-                                ctx.fillStyle = "#ffffff";
-                                roundRect(x, y, 7 * cell, 7 * cell, cell * 1.3);
-                                ctx.fillStyle = "#0a0a0a";
-                                roundRect(x + cell, y + cell, 5 * cell, 5 * cell, cell * 0.9);
-                                ctx.fillStyle = "#ffffff";
-                                roundRect(x + 2 * cell, y + 2 * cell, 3 * cell, 3 * cell, cell * 0.75);
-                            };
-                            ctx.fillStyle = "#0a0a0a";
-                            ctx.fillRect(0, 0, size, size);
-                            let painted = 0;
-                            ctx.fillStyle = "#ffffff";
-                            for (let r = 0; r < n; r++) {
-                                for (let c = 0; c < n; c++) {
-                                    if (!on(r, c) || isFinder(r, c)) continue;
-                                    ctx.beginPath();
-                                    ctx.arc(offset + (c + 0.5) * cell, offset + (r + 0.5) * cell, cell * 0.36, 0, Math.PI * 2);
-                                    ctx.fill();
-                                    painted++;
-                                }
-                            }
-                            finder(0, 0); finder(0, n - 7); finder(n - 7, 0);
-                            if (painted < 10) {
-                                await QR.toCanvas(canvas, data, {
-                                    width: size, margin: 2, errorCorrectionLevel: "H",
-                                    color: { dark: "#ffffff", light: "#0a0a0a" },
-                                });
-                            }
-                        }
-                    } catch (_) { /* keep square QR */ }
-                }
                 return;
             } catch (e) {
                 console.warn("[E2EE] toCanvas failed:", e);
             }
         }
 
-        // Fallback: external QR image API (no library needed)
-        console.warn("[E2EE] QRCode library not loaded — using image API fallback");
+        // Last resort: image API
         if (img) {
+            if (host) host.innerHTML = "";
             if (canvas) canvas.classList.add("hidden");
             img.classList.remove("hidden");
             img.src = "https://api.qrserver.com/v1/create-qr-code/?size=" + size + "x" + size
-                + "&margin=8&ecc=H&color=ffffff&bgcolor=0a0a0a&data=" + encodeURIComponent(data);
-        } else if (canvas) {
-            // draw image onto canvas
-            const pic = new Image();
-            pic.crossOrigin = "anonymous";
-            pic.onload = () => {
-                canvas.width = size;
-                canvas.height = size;
-                canvas.getContext("2d").drawImage(pic, 0, 0, size, size);
-            };
-            pic.src = "https://api.qrserver.com/v1/create-qr-code/?size=" + size + "x" + size
                 + "&margin=8&ecc=H&color=ffffff&bgcolor=0a0a0a&data=" + encodeURIComponent(data);
         }
     }
