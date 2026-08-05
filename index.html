@@ -749,7 +749,6 @@
             </button>
         </div>
 
-        <!-- Tabs -->
         <div class="px-5 pb-3">
             <div class="flex rounded-full p-1" style="background-color: var(--elevated);">
                 <button type="button" id="safetyTabMyCode"
@@ -761,7 +760,6 @@
             </div>
         </div>
 
-        <!-- My Code panel -->
         <div id="safetyPanelMyCode" class="px-5 pb-4 flex flex-col items-center gap-4">
             <div class="w-full rounded-2xl p-4 flex flex-col items-center gap-4"
                  style="background-color: var(--elevated); border: 1px solid var(--transparent-border);">
@@ -792,20 +790,29 @@
             </button>
         </div>
 
-        <!-- Scan Code panel -->
-        <div id="safetyPanelScan" class="hidden px-5 pb-5 flex flex-col items-center gap-4">
-            <div class="w-full rounded-2xl overflow-hidden relative"
+        <div id="safetyPanelScan" class="hidden px-5 pb-5 flex flex-col items-center gap-3">
+            <div id="safetyScanBox" class="w-full rounded-2xl overflow-hidden relative"
                  style="background-color:#0a0a0a;border:1px solid rgba(255,255,255,0.1);aspect-ratio:1;max-width:280px;">
-                <video id="safetyScanVideo" class="absolute inset-0 w-full h-full object-cover" playsinline muted></video>
+                <video id="safetyScanVideo" playsinline muted autoplay
+                       class="absolute inset-0 w-full h-full object-cover"
+                       style="transform: scaleX(-1);"></video>
                 <canvas id="safetyScanCanvas" class="hidden"></canvas>
                 <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div style="width:70%;height:70%;border:2px solid rgba(255,255,255,0.55);border-radius:16px;"></div>
+                    <div style="width:68%;height:68%;border:2px solid rgba(255,255,255,0.65);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
                 </div>
+                <p id="safetyScanStatus" class="absolute bottom-2 left-0 right-0 text-center text-[11px] text-white/80">Starting camera…</p>
             </div>
             <p id="safetyScanHint" class="text-center text-[12px] leading-relaxed" style="color: var(--muted);">
-                Point the camera at their QR code to compare safety numbers.
+                Point the camera at their QR code, or upload a screenshot.
             </p>
-            <p id="safetyScanResult" class="hidden text-center text-xs font-semibold"></p>
+            <label class="w-full">
+                <input type="file" id="safetyScanFile" accept="image/*" capture="environment" class="hidden" />
+                <span class="flex w-full cursor-pointer items-center justify-center rounded-full py-2.5 text-xs font-semibold transition-opacity hover:opacity-90"
+                      style="background-color: var(--elevated); color: var(--ink); border: 1px solid var(--transparent-border);">
+                    Upload QR image
+                </span>
+            </label>
+            <p id="safetyScanResult" class="hidden text-center text-xs font-semibold px-2"></p>
         </div>
     </div>
 </div>
@@ -816,7 +823,9 @@
     window.ZCHAT_SIGNAL_URL = localStorage.getItem("zchat_signal_url") || "https://zchat-backend-call.onrender.com";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.4/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="js/e2ee.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/main.js"></script>
