@@ -1862,8 +1862,15 @@ function getVerifiedBadge(isVerified) {
     const openSafetyNumberBtn = document.getElementById("openSafetyNumberBtn");
     const closeSafetyNumberBtn = document.getElementById("closeSafetyNumberBtn");
     const safetyMarkVerifiedBtn = document.getElementById("safetyMarkVerifiedBtn");
+    const safetyTabMyCode = document.getElementById("safetyTabMyCode");
+    const safetyTabScan = document.getElementById("safetyTabScan");
+    const safetyPanelMyCode = document.getElementById("safetyPanelMyCode");
+    const safetyPanelScan = document.getElementById("safetyPanelScan");
     let _safetyPartnerId = null;
     let _safetyIsVerified = false;
+    let _safetyNumberRaw = "";
+    let _scanStream = null;
+    let _scanRaf = 0;
 
     function setVerifyBtnLabel(isVerified) {
         if (!safetyMarkVerifiedBtn) return;
@@ -1886,35 +1893,178 @@ function getVerifiedBadge(isVerified) {
         return html;
     }
 
+    function setSafetyTab(which) {
+        const isMy = which === "my";
+        if (safetyPanelMyCode) safetyPanelMyCode.classList.toggle("hidden", !isMy);
+        if (safetyPanelScan) safetyPanelScan.classList.toggle("hidden", isMy);
+        if (safetyTabMyCode) {
+            safetyTabMyCode.style.backgroundColor = isMy ? "var(--ink)" : "transparent";
+            safetyTabMyCode.style.color = isMy ? "var(--canvas)" : "var(--muted)";
+        }
+        if (safetyTabScan) {
+            safetyTabScan.style.backgroundColor = !isMy ? "var(--ink)" : "transparent";
+            safetyTabScan.style.color = !isMy ? "var(--canvas)" : "var(--muted)";
+        }
+        if (isMy) stopSafetyScanner();
+        else startSafetyScanner();
+    }
+
+    /** QR: dots + rounded finder eyes */
     async function renderSafetyQr(payload) {
         const canvas = document.getElementById("safetyQrCanvas");
-        const img = document.getElementById("safetyQrImg");
         const data = String(payload || "").replace(/\s+/g, "");
-        if (!data) return;
-        if (canvas) {
-            canvas.classList.remove("hidden");
-            const ctx = canvas.getContext("2d");
-            ctx.fillStyle = "#0a0a0a";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        if (img) { img.classList.add("hidden"); img.removeAttribute("src"); }
+        if (!canvas || !data) return;
+        const size = 192;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(0, 0, size, size);
 
-        let ok = false;
-        if (canvas && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
-            try {
-                await QRCode.toCanvas(canvas, data, {
-                    width: 192,
-                    margin: 4, // quiet zone — không sát mép
-                    errorCorrectionLevel: "H",
-                    color: { dark: "#ffffff", light: "#0a0a0a" },
-                });
-                ok = true;
-            } catch (e) { console.warn("[E2EE] QRCode.toCanvas failed:", e); }
+        if (typeof QRCode === "undefined" || typeof QRCode.create !== "function") {
+            if (typeof QRCode !== "undefined" && QRCode.toCanvas) {
+                try {
+                    await QRCode.toCanvas(canvas, data, {
+                        width: size, margin: 3, errorCorrectionLevel: "H",
+                        color: { dark: "#ffffff", light: "#0a0a0a" },
+                    });
+                } catch (e) { console.warn("[E2EE] QR fallback:", e); }
+            }
+            return;
         }
-        if (!ok && img) {
-            img.onload = () => { img.classList.remove("hidden"); if (canvas) canvas.classList.add("hidden"); };
-            img.src = "https://api.qrserver.com/v1/create-qr-code/?size=192x192&margin=12&ecc=H&color=ffffff&bgcolor=0a0a0a&data="
-                + encodeURIComponent(data);
+
+        try {
+            const qr = QRCode.create(data, { errorCorrectionLevel: "H" });
+            const mods = qr.modules;
+            const n = mods.size;
+            const marginMods = 2;
+            const total = n + marginMods * 2;
+            const cell = size / total;
+            const offset = marginMods * cell;
+            const dark = "#ffffff";
+
+            function isFinder(r, c) {
+                return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+            }
+
+            function drawRoundedRect(x, y, w, h, r) {
+                const rr = Math.min(r, w / 2, h / 2);
+                ctx.beginPath();
+                ctx.moveTo(x + rr, y);
+                ctx.arcTo(x + w, y, x + w, y + h, rr);
+                ctx.arcTo(x + w, y + h, x, y + h, rr);
+                ctx.arcTo(x, y + h, x, y, rr);
+                ctx.arcTo(x, y, x + w, y, rr);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function drawFinder(row0, col0) {
+                const x = offset + col0 * cell;
+                const y = offset + row0 * cell;
+                ctx.fillStyle = dark;
+                drawRoundedRect(x, y, 7 * cell, 7 * cell, cell * 1.4);
+                ctx.fillStyle = "#0a0a0a";
+                drawRoundedRect(x + cell, y + cell, 5 * cell, 5 * cell, cell * 1.0);
+                ctx.fillStyle = dark;
+                drawRoundedRect(x + 2 * cell, y + 2 * cell, 3 * cell, 3 * cell, cell * 0.85);
+            }
+
+            ctx.fillStyle = dark;
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    if (!mods.get(r, c) || isFinder(r, c)) continue;
+                    const cx = offset + (c + 0.5) * cell;
+                    const cy = offset + (r + 0.5) * cell;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, cell * 0.38, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            drawFinder(0, 0);
+            drawFinder(0, n - 7);
+            drawFinder(n - 7, 0);
+        } catch (e) {
+            console.warn("[E2EE] styled QR failed:", e);
+        }
+    }
+
+    function stopSafetyScanner() {
+        if (_scanRaf) { cancelAnimationFrame(_scanRaf); _scanRaf = 0; }
+        if (_scanStream) {
+            _scanStream.getTracks().forEach((tr) => tr.stop());
+            _scanStream = null;
+        }
+        const video = document.getElementById("safetyScanVideo");
+        if (video) video.srcObject = null;
+    }
+
+    async function startSafetyScanner() {
+        stopSafetyScanner();
+        const video = document.getElementById("safetyScanVideo");
+        const scanCanvas = document.getElementById("safetyScanCanvas");
+        const resultEl = document.getElementById("safetyScanResult");
+        if (!video || !scanCanvas) return;
+        if (resultEl) { resultEl.classList.add("hidden"); resultEl.textContent = ""; }
+        try {
+            _scanStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: "environment" } },
+                audio: false,
+            });
+            video.srcObject = _scanStream;
+            await video.play();
+        } catch (err) {
+            console.warn("[E2EE] camera:", err);
+            if (resultEl) {
+                resultEl.textContent = "Camera permission denied";
+                resultEl.style.color = "#f87171";
+                resultEl.classList.remove("hidden");
+            }
+            return;
+        }
+
+        const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
+        const tick = () => {
+            if (!_scanStream) return;
+            if (video.readyState >= 2) {
+                const w = video.videoWidth, h = video.videoHeight;
+                if (w && h) {
+                    scanCanvas.width = w;
+                    scanCanvas.height = h;
+                    ctx.drawImage(video, 0, 0, w, h);
+                    if (typeof jsQR === "function") {
+                        const imageData = ctx.getImageData(0, 0, w, h);
+                        const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
+                        if (code && code.data) {
+                            handleScannedCode(code.data);
+                            return;
+                        }
+                    }
+                }
+            }
+            _scanRaf = requestAnimationFrame(tick);
+        };
+        _scanRaf = requestAnimationFrame(tick);
+    }
+
+    function handleScannedCode(raw) {
+        const scanned = String(raw || "").replace(/\s+/g, "");
+        const mine = String(_safetyNumberRaw || "").replace(/\s+/g, "");
+        const resultEl = document.getElementById("safetyScanResult");
+        stopSafetyScanner();
+        if (!resultEl) return;
+        resultEl.classList.remove("hidden");
+        if (!mine) {
+            resultEl.textContent = "Your safety number not ready";
+            resultEl.style.color = "#f87171";
+            return;
+        }
+        if (scanned === mine) {
+            resultEl.textContent = "Match — safety numbers are identical";
+            resultEl.style.color = "#34d399";
+        } else {
+            resultEl.textContent = "No match — numbers differ (possible MITM)";
+            resultEl.style.color = "#f87171";
         }
     }
 
@@ -1928,8 +2078,10 @@ function getVerifiedBadge(isVerified) {
         const errEl = document.getElementById("safetyNumberError");
 
         safetyNumberModal.classList.remove("hidden");
+        setSafetyTab("my");
         if (errEl) { errEl.classList.add("hidden"); errEl.textContent = ""; }
         if (grid) grid.textContent = "…";
+        _safetyNumberRaw = "";
         if (hint) {
             hint.textContent = "To verify end-to-end encryption with "
                 + chat.participant.name + ", compare numbers above with their device.";
@@ -1974,6 +2126,7 @@ function getVerifiedBadge(isVerified) {
             }
 
             const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
+            _safetyNumberRaw = num;
             if (grid) grid.innerHTML = formatSafetyGrid(num);
             await renderSafetyQr(num);
 
@@ -1992,6 +2145,7 @@ function getVerifiedBadge(isVerified) {
     }
 
     function closeSafetyNumberModal() {
+        stopSafetyScanner();
         if (safetyNumberModal) safetyNumberModal.classList.add("hidden");
     }
 
@@ -2007,6 +2161,9 @@ function getVerifiedBadge(isVerified) {
             if (e.target === safetyNumberModal) closeSafetyNumberModal();
         });
     }
+    if (safetyTabMyCode) safetyTabMyCode.addEventListener("click", () => setSafetyTab("my"));
+    if (safetyTabScan) safetyTabScan.addEventListener("click", () => setSafetyTab("scan"));
+
     if (safetyMarkVerifiedBtn) {
         safetyMarkVerifiedBtn.addEventListener("click", async () => {
             if (!window.ZChatE2EE) return;
