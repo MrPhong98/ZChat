@@ -1870,9 +1870,8 @@ function getVerifiedBadge(isVerified) {
     let _safetyPartnerId = null;
     let _safetyIsVerified = false;
     let _safetyNumberRaw = "";
-    let _scanStream = null;
-    let _scanRaf = 0;
-    let _scanBusy = false;
+    let _html5Qr = null;
+    let _scanRunning = false;
 
     function setVerifyBtnLabel(isVerified) {
         if (!safetyMarkVerifiedBtn) return;
@@ -1918,7 +1917,6 @@ function getVerifiedBadge(isVerified) {
         if (!data) return;
         const size = 192;
         const QR = window.QRCode || (typeof QRCode !== "undefined" ? QRCode : null);
-
         if (canvas && QR && typeof QR.toCanvas === "function") {
             try {
                 canvas.classList.remove("hidden");
@@ -1926,9 +1924,7 @@ function getVerifiedBadge(isVerified) {
                 canvas.width = size;
                 canvas.height = size;
                 await QR.toCanvas(canvas, data, {
-                    width: size,
-                    margin: 3,
-                    errorCorrectionLevel: "H",
+                    width: size, margin: 3, errorCorrectionLevel: "H",
                     color: { dark: "#ffffff", light: "#0a0a0a" },
                 });
                 return;
@@ -1944,160 +1940,17 @@ function getVerifiedBadge(isVerified) {
         }
     }
 
-    function stopSafetyScanner() {
-        _scanBusy = false;
-        if (_scanRaf) { cancelAnimationFrame(_scanRaf); _scanRaf = 0; }
-        if (_scanStream) {
-            try { _scanStream.getTracks().forEach((tr) => tr.stop()); } catch (_) {}
-            _scanStream = null;
-        }
-        const video = document.getElementById("safetyScanVideo");
-        if (video) {
-            try { video.pause(); } catch (_) {}
-            video.srcObject = null;
-        }
-        const st = document.getElementById("safetyScanStatus");
-        if (st) st.textContent = "";
-    }
-
-    function decodeQrFromImageData(imageData) {
-        // 1) Native BarcodeDetector
-        // 2) jsQR
-        return new Promise(async (resolve) => {
+    async function stopSafetyScanner() {
+        _scanRunning = false;
+        if (_html5Qr) {
             try {
-                if (window.BarcodeDetector) {
-                    const detector = new BarcodeDetector({ formats: ["qr_code"] });
-                    // BarcodeDetector wants ImageBitmap / canvas / video - use canvas path below
-                }
+                if (_html5Qr.isScanning) await _html5Qr.stop();
             } catch (_) {}
-
-            if (typeof jsQR === "function") {
-                try {
-                    let code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "attemptBoth",
-                    });
-                    if (code && code.data) return resolve(code.data);
-                } catch (e) {
-                    console.warn("[E2EE] jsQR error:", e);
-                }
-            }
-            resolve(null);
-        });
-    }
-
-    async function decodeQrFromCanvas(canvas) {
-        if (!canvas) return null;
-        // BarcodeDetector
-        try {
-            if (window.BarcodeDetector) {
-                const detector = new BarcodeDetector({ formats: ["qr_code"] });
-                const codes = await detector.detect(canvas);
-                if (codes && codes[0] && codes[0].rawValue) return codes[0].rawValue;
-            }
-        } catch (_) {}
-        try {
-            const ctx = canvas.getContext("2d", { willReadFrequently: true });
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            if (typeof jsQR === "function") {
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "attemptBoth",
-                });
-                if (code && code.data) return code.data;
-            }
-        } catch (e) {
-            console.warn("[E2EE] decode canvas:", e);
+            try { await _html5Qr.clear(); } catch (_) {}
+            _html5Qr = null;
         }
-        return null;
-    }
-
-    async function startSafetyScanner() {
-        stopSafetyScanner();
-        const video = document.getElementById("safetyScanVideo");
-        const scanCanvas = document.getElementById("safetyScanCanvas");
-        const resultEl = document.getElementById("safetyScanResult");
-        const statusEl = document.getElementById("safetyScanStatus");
-        if (!video || !scanCanvas) return;
-        if (resultEl) { resultEl.classList.add("hidden"); resultEl.textContent = ""; }
-        if (statusEl) statusEl.textContent = "Starting camera…";
-
-        const constraintsList = [
-            { audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } },
-            { audio: false, video: { facingMode: "user" } },
-            { audio: false, video: true },
-        ];
-
-        let lastErr = null;
-        for (const constraints of constraintsList) {
-            try {
-                _scanStream = await navigator.mediaDevices.getUserMedia(constraints);
-                break;
-            } catch (err) {
-                lastErr = err;
-            }
-        }
-        if (!_scanStream) {
-            console.warn("[E2EE] camera failed:", lastErr);
-            if (statusEl) statusEl.textContent = "Camera unavailable — use Upload QR image";
-            if (resultEl) {
-                resultEl.textContent = (lastErr && lastErr.message) || "Camera permission denied";
-                resultEl.style.color = "#f87171";
-                resultEl.classList.remove("hidden");
-            }
-            return;
-        }
-
-        video.srcObject = _scanStream;
-        video.setAttribute("playsinline", "true");
-        video.muted = true;
-        try {
-            await video.play();
-        } catch (e) {
-            console.warn("[E2EE] video.play:", e);
-        }
-        if (statusEl) statusEl.textContent = "Align QR inside the frame";
-
-        const ctx = scanCanvas.getContext("2d", { willReadFrequently: true });
-        let lastTry = 0;
-
-        const tick = async () => {
-            if (!_scanStream) return;
-            _scanRaf = requestAnimationFrame(tick);
-            const now = Date.now();
-            if (now - lastTry < 250) return; // ~4 fps decode
-            lastTry = now;
-            if (_scanBusy) return;
-            if (video.readyState < 2) return;
-
-            const w = video.videoWidth;
-            const h = video.videoHeight;
-            if (!w || !h) return;
-
-            // sample center square (where the frame is)
-            const side = Math.min(w, h) * 0.72;
-            const sx = (w - side) / 2;
-            const sy = (h - side) / 2;
-            const out = 400;
-            scanCanvas.width = out;
-            scanCanvas.height = out;
-            // video is mirrored in CSS; draw mirrored so decode matches what user aims
-            ctx.save();
-            ctx.translate(out, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, sx, sy, side, side, 0, 0, out, out);
-            ctx.restore();
-
-            _scanBusy = true;
-            try {
-                const value = await decodeQrFromCanvas(scanCanvas);
-                if (value) {
-                    handleScannedCode(value);
-                    return;
-                }
-            } finally {
-                _scanBusy = false;
-            }
-        };
-        _scanRaf = requestAnimationFrame(tick);
+        const reader = document.getElementById("safetyScanReader");
+        if (reader) reader.innerHTML = "";
     }
 
     function normalizeSafetyPayload(s) {
@@ -2108,13 +1961,11 @@ function getVerifiedBadge(isVerified) {
         const scanned = normalizeSafetyPayload(raw);
         const mine = normalizeSafetyPayload(_safetyNumberRaw);
         const resultEl = document.getElementById("safetyScanResult");
-        const statusEl = document.getElementById("safetyScanStatus");
         stopSafetyScanner();
-        if (statusEl) statusEl.textContent = "Scanned";
         if (!resultEl) return;
         resultEl.classList.remove("hidden");
         if (!mine) {
-            resultEl.textContent = "Your safety number not ready — open My Code first";
+            resultEl.textContent = "Open My Code first so your number is ready";
             resultEl.style.color = "#f87171";
             return;
         }
@@ -2124,38 +1975,96 @@ function getVerifiedBadge(isVerified) {
         } else {
             resultEl.textContent = "No match — numbers differ (possible MITM)";
             resultEl.style.color = "#f87171";
-            console.log("[E2EE] scan compare", { scannedLen: scanned.length, mineLen: mine.length, scanned: scanned.slice(0, 40), mine: mine.slice(0, 40) });
+            console.log("[E2EE] mismatch", scanned.slice(0, 48), mine.slice(0, 48));
+        }
+    }
+
+    async function startSafetyScanner() {
+        const resultEl = document.getElementById("safetyScanResult");
+        const readerId = "safetyScanReader";
+        const reader = document.getElementById(readerId);
+        if (!reader) return;
+        if (resultEl) { resultEl.classList.add("hidden"); resultEl.textContent = ""; }
+
+        await stopSafetyScanner();
+        reader.innerHTML = "";
+
+        if (typeof Html5Qrcode === "undefined") {
+            if (resultEl) {
+                resultEl.textContent = "Scanner library not loaded — use Upload QR image";
+                resultEl.style.color = "#f87171";
+                resultEl.classList.remove("hidden");
+            }
+            return;
+        }
+
+        _html5Qr = new Html5Qrcode(readerId, { verbose: false });
+        _scanRunning = true;
+
+        const config = {
+            fps: 10,
+            qrbox: (viewW, viewH) => {
+                const s = Math.floor(Math.min(viewW, viewH) * 0.7);
+                return { width: s, height: s };
+            },
+            aspectRatio: 1,
+            disableFlip: false,
+        };
+
+        const onSuccess = (decodedText) => {
+            if (!_scanRunning) return;
+            _scanRunning = false;
+            handleScannedCode(decodedText);
+        };
+
+        try {
+            const cameras = await Html5Qrcode.getCameras();
+            let cameraIdOrConfig = { facingMode: "environment" };
+            if (cameras && cameras.length) {
+                // prefer back camera if label hints
+                const back = cameras.find((c) => /back|rear|environment/i.test(c.label || ""));
+                cameraIdOrConfig = (back || cameras[cameras.length - 1]).id;
+            }
+            await _html5Qr.start(cameraIdOrConfig, config, onSuccess, () => {});
+        } catch (err1) {
+            console.warn("[E2EE] env camera failed, try user:", err1);
+            try {
+                await _html5Qr.start({ facingMode: "user" }, config, onSuccess, () => {});
+            } catch (err2) {
+                console.warn("[E2EE] scanner start failed:", err2);
+                if (resultEl) {
+                    resultEl.textContent = "Camera blocked — use Upload QR image instead";
+                    resultEl.style.color = "#f87171";
+                    resultEl.classList.remove("hidden");
+                }
+            }
         }
     }
 
     async function scanFromFile(file) {
         if (!file) return;
         const resultEl = document.getElementById("safetyScanResult");
-        const statusEl = document.getElementById("safetyScanStatus");
-        if (statusEl) statusEl.textContent = "Reading image…";
         try {
-            const bitmap = await createImageBitmap(file);
-            const canvas = document.getElementById("safetyScanCanvas") || document.createElement("canvas");
-            const max = 800;
-            const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-            const ctx = canvas.getContext("2d", { willReadFrequently: true });
-            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-            const value = await decodeQrFromCanvas(canvas);
-            if (value) handleScannedCode(value);
-            else {
+            if (typeof Html5Qrcode === "undefined") {
                 if (resultEl) {
-                    resultEl.textContent = "No QR found in image";
+                    resultEl.textContent = "Scanner library missing";
                     resultEl.style.color = "#f87171";
                     resultEl.classList.remove("hidden");
                 }
-                if (statusEl) statusEl.textContent = "Try another image";
+                return;
             }
+            // stop live camera first
+            await stopSafetyScanner();
+            const reader = document.getElementById("safetyScanReader");
+            if (reader) reader.innerHTML = "";
+            const scanner = new Html5Qrcode("safetyScanReader", { verbose: false });
+            const text = await scanner.scanFile(file, true);
+            try { await scanner.clear(); } catch (_) {}
+            handleScannedCode(text);
         } catch (e) {
             console.warn("[E2EE] scan file:", e);
             if (resultEl) {
-                resultEl.textContent = "Could not read image";
+                resultEl.textContent = "No QR found in image";
                 resultEl.style.color = "#f87171";
                 resultEl.classList.remove("hidden");
             }
@@ -2187,7 +2096,7 @@ function getVerifiedBadge(isVerified) {
         if (!window.ZChatE2EE) {
             if (grid) grid.textContent = "E2EE unavailable";
             if (errEl) {
-                errEl.textContent = "Missing js/e2ee.js — upload and hard refresh";
+                errEl.textContent = "Missing js/e2ee.js";
                 errEl.classList.remove("hidden");
             }
             return;
@@ -2284,7 +2193,6 @@ function getVerifiedBadge(isVerified) {
                 setTimeout(() => { safetyMarkVerifiedBtn.textContent = prev; }, 1500);
                 return;
             }
-
             const wasVerified = _safetyIsVerified;
             safetyMarkVerifiedBtn.textContent = "…";
             try {
