@@ -214,7 +214,7 @@
             );
             const bytes = new Uint8Array(hashBuf);
             let digits = "";
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 15; i++) {
                 digits += String(bytes[i] % 10);
                 digits += String(Math.floor(bytes[i] / 10) % 10);
             }
@@ -250,7 +250,7 @@
     }
 
     /**
-     * Bảng verified_contacts:
+     * Bảng verified_users:
      *   verifier_id, verified_user_id, verifier_username, verified_username, created_at
      */
     async function markUserAsVerified(targetUserId, myUsername, partnerUsername) {
@@ -270,7 +270,7 @@
             verified_username: verifiedName || null,
         };
         const { data, error } = await global.supabaseClient
-            .from("verified_contacts")
+            .from("verified_users")
             .upsert(row, { onConflict: "verifier_id,verified_user_id" })
             .select()
             .maybeSingle();
@@ -285,7 +285,7 @@
         const { myId } = await _resolveMyUser(myUsername);
         if (!myId) throw new Error("Current user id missing");
         const { error } = await global.supabaseClient
-            .from("verified_contacts")
+            .from("verified_users")
             .delete()
             .eq("verifier_id", myId)
             .eq("verified_user_id", String(targetUserId));
@@ -299,7 +299,7 @@
             const { myId } = await _resolveMyUser(myUsername);
             if (!myId) return false;
             const { data, error } = await global.supabaseClient
-                .from("verified_contacts")
+                .from("verified_users")
                 .select("verifier_id")
                 .eq("verifier_id", myId)
                 .eq("verified_user_id", String(targetUserId))
