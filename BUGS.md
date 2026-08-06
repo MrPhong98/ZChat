@@ -12,5 +12,4 @@ Danh sách các lỗi cần xử lý và tiến độ sửa lỗi.
 
 ## ✅ Đã sửa (Resolved)
 
-- [x] ~~**Lỗi Deploy Vercel**~~: Thiếu biến môi trường `ENV` khi build project -> *Fixed ngày 06/08*.
-- [x] **Lỗi không upload được ảnh đại diện**: Không upload được ảnh đại diện và báo lỗi "[ZChat] Avatar upload error: StorageApiError: new row violates row-level security policy at supabase-js@2:13:10331".
+- [x] **Lỗi không upload được ảnh đại diện**: Không upload được ảnh đại diện và báo lỗi "[ZChat] Avatar upload error: StorageApiError: new row violates row-level security policy at supabase-js@2:13:10331". Fixed ngày 6/8/2026
