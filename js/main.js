@@ -1862,16 +1862,8 @@ function getVerifiedBadge(isVerified) {
     const openSafetyNumberBtn = document.getElementById("openSafetyNumberBtn");
     const closeSafetyNumberBtn = document.getElementById("closeSafetyNumberBtn");
     const safetyMarkVerifiedBtn = document.getElementById("safetyMarkVerifiedBtn");
-    const safetyTabMyCode = document.getElementById("safetyTabMyCode");
-    const safetyTabScan = document.getElementById("safetyTabScan");
-    const safetyPanelMyCode = document.getElementById("safetyPanelMyCode");
-    const safetyPanelScan = document.getElementById("safetyPanelScan");
-    const safetyScanFile = document.getElementById("safetyScanFile");
     let _safetyPartnerId = null;
     let _safetyIsVerified = false;
-    let _safetyNumberRaw = "";
-    let _html5Qr = null;
-    let _scanRunning = false;
 
     function setVerifyBtnLabel(isVerified) {
         if (!safetyMarkVerifiedBtn) return;
@@ -1894,192 +1886,35 @@ function getVerifiedBadge(isVerified) {
         return html;
     }
 
-    function setSafetyTab(which) {
-        const isMy = which === "my";
-        if (safetyPanelMyCode) safetyPanelMyCode.classList.toggle("hidden", !isMy);
-        if (safetyPanelScan) safetyPanelScan.classList.toggle("hidden", isMy);
-        if (safetyTabMyCode) {
-            safetyTabMyCode.style.backgroundColor = isMy ? "var(--ink)" : "transparent";
-            safetyTabMyCode.style.color = isMy ? "var(--canvas)" : "var(--muted)";
-        }
-        if (safetyTabScan) {
-            safetyTabScan.style.backgroundColor = !isMy ? "var(--ink)" : "transparent";
-            safetyTabScan.style.color = !isMy ? "var(--canvas)" : "var(--muted)";
-        }
-        if (isMy) stopSafetyScanner();
-        else startSafetyScanner();
-    }
-
     async function renderSafetyQr(payload) {
         const canvas = document.getElementById("safetyQrCanvas");
         const img = document.getElementById("safetyQrImg");
         const data = String(payload || "").replace(/\s+/g, "");
         if (!data) return;
-        const size = 192;
-        const QR = window.QRCode || (typeof QRCode !== "undefined" ? QRCode : null);
-        if (canvas && QR && typeof QR.toCanvas === "function") {
+        if (canvas) {
+            canvas.classList.remove("hidden");
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#0a0a0a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        if (img) { img.classList.add("hidden"); img.removeAttribute("src"); }
+
+        let ok = false;
+        if (canvas && typeof QRCode !== "undefined" && typeof QRCode.toCanvas === "function") {
             try {
-                canvas.classList.remove("hidden");
-                if (img) img.classList.add("hidden");
-                canvas.width = size;
-                canvas.height = size;
-                await QR.toCanvas(canvas, data, {
-                    width: size, margin: 3, errorCorrectionLevel: "H",
+                await QRCode.toCanvas(canvas, data, {
+                    width: 192,
+                    margin: 4, // quiet zone — không sát mép
+                    errorCorrectionLevel: "H",
                     color: { dark: "#ffffff", light: "#0a0a0a" },
                 });
-                return;
-            } catch (e) {
-                console.warn("[E2EE] toCanvas failed:", e);
-            }
+                ok = true;
+            } catch (e) { console.warn("[E2EE] QRCode.toCanvas failed:", e); }
         }
-        if (img) {
-            if (canvas) canvas.classList.add("hidden");
-            img.classList.remove("hidden");
-            img.src = "https://api.qrserver.com/v1/create-qr-code/?size=" + size + "x" + size
-                + "&margin=10&ecc=H&color=ffffff&bgcolor=0a0a0a&data=" + encodeURIComponent(data);
-        }
-    }
-
-    function unmirrorScanPreview() {
-        const root = document.getElementById("safetyScanReader");
-        if (!root) return;
-        root.querySelectorAll("video, canvas").forEach((el) => {
-            el.style.transform = "none";
-            el.style.webkitTransform = "none";
-        });
-    }
-
-    async function stopSafetyScanner() {
-        _scanRunning = false;
-        if (_html5Qr) {
-            try {
-                if (_html5Qr.isScanning) await _html5Qr.stop();
-            } catch (_) {}
-            try { await _html5Qr.clear(); } catch (_) {}
-            _html5Qr = null;
-        }
-        const reader = document.getElementById("safetyScanReader");
-        if (reader) reader.innerHTML = "";
-    }
-
-    function normalizeSafetyPayload(s) {
-        return String(s || "").replace(/\s+/g, "").trim();
-    }
-
-    function handleScannedCode(raw) {
-        const scanned = normalizeSafetyPayload(raw);
-        const mine = normalizeSafetyPayload(_safetyNumberRaw);
-        const resultEl = document.getElementById("safetyScanResult");
-        stopSafetyScanner();
-        if (!resultEl) return;
-        resultEl.classList.remove("hidden");
-        if (!mine) {
-            resultEl.textContent = "Open My Code first so your number is ready";
-            resultEl.style.color = "#f87171";
-            return;
-        }
-        if (scanned === mine) {
-            resultEl.textContent = "Match — safety numbers are identical";
-            resultEl.style.color = "#34d399";
-        } else {
-            resultEl.textContent = "No match — numbers differ (possible MITM)";
-            resultEl.style.color = "#f87171";
-        }
-    }
-
-    async function startSafetyScanner() {
-        const resultEl = document.getElementById("safetyScanResult");
-        const readerId = "safetyScanReader";
-        const reader = document.getElementById(readerId);
-        if (!reader) return;
-        if (resultEl) { resultEl.classList.add("hidden"); resultEl.textContent = ""; }
-
-        await stopSafetyScanner();
-        reader.innerHTML = "";
-
-        if (typeof Html5Qrcode === "undefined") {
-            if (resultEl) {
-                resultEl.textContent = "Scanner library not loaded — use Upload QR image";
-                resultEl.style.color = "#f87171";
-                resultEl.classList.remove("hidden");
-            }
-            return;
-        }
-
-        _html5Qr = new Html5Qrcode(readerId, { verbose: false });
-        _scanRunning = true;
-
-        const config = {
-            fps: 10,
-            qrbox: (viewW, viewH) => {
-                const s = Math.floor(Math.min(viewW, viewH) * 0.7);
-                return { width: s, height: s };
-            },
-            aspectRatio: 1,
-            // không lật khung hình khi decode
-            disableFlip: true,
-        };
-
-        const onSuccess = (decodedText) => {
-            if (!_scanRunning) return;
-            _scanRunning = false;
-            handleScannedCode(decodedText);
-        };
-
-        try {
-            const cameras = await Html5Qrcode.getCameras();
-            let cameraIdOrConfig = { facingMode: "environment" };
-            if (cameras && cameras.length) {
-                const back = cameras.find((c) => /back|rear|environment/i.test(c.label || ""));
-                cameraIdOrConfig = (back || cameras[cameras.length - 1]).id;
-            }
-            await _html5Qr.start(cameraIdOrConfig, config, onSuccess, () => {});
-            // bỏ mirror nếu browser/lib tự gắn
-            setTimeout(unmirrorScanPreview, 100);
-            setTimeout(unmirrorScanPreview, 500);
-        } catch (err1) {
-            console.warn("[E2EE] env camera failed, try user:", err1);
-            try {
-                await _html5Qr.start({ facingMode: "user" }, config, onSuccess, () => {});
-                setTimeout(unmirrorScanPreview, 100);
-                setTimeout(unmirrorScanPreview, 500);
-            } catch (err2) {
-                console.warn("[E2EE] scanner start failed:", err2);
-                if (resultEl) {
-                    resultEl.textContent = "Camera blocked — use Upload QR image instead";
-                    resultEl.style.color = "#f87171";
-                    resultEl.classList.remove("hidden");
-                }
-            }
-        }
-    }
-
-    async function scanFromFile(file) {
-        if (!file) return;
-        const resultEl = document.getElementById("safetyScanResult");
-        try {
-            if (typeof Html5Qrcode === "undefined") {
-                if (resultEl) {
-                    resultEl.textContent = "Scanner library missing";
-                    resultEl.style.color = "#f87171";
-                    resultEl.classList.remove("hidden");
-                }
-                return;
-            }
-            await stopSafetyScanner();
-            const reader = document.getElementById("safetyScanReader");
-            if (reader) reader.innerHTML = "";
-            const scanner = new Html5Qrcode("safetyScanReader", { verbose: false });
-            const text = await scanner.scanFile(file, true);
-            try { await scanner.clear(); } catch (_) {}
-            handleScannedCode(text);
-        } catch (e) {
-            console.warn("[E2EE] scan file:", e);
-            if (resultEl) {
-                resultEl.textContent = "No QR found in image";
-                resultEl.style.color = "#f87171";
-                resultEl.classList.remove("hidden");
-            }
+        if (!ok && img) {
+            img.onload = () => { img.classList.remove("hidden"); if (canvas) canvas.classList.add("hidden"); };
+            img.src = "https://api.qrserver.com/v1/create-qr-code/?size=192x192&margin=12&ecc=H&color=ffffff&bgcolor=0a0a0a&data="
+                + encodeURIComponent(data);
         }
     }
 
@@ -2093,10 +1928,8 @@ function getVerifiedBadge(isVerified) {
         const errEl = document.getElementById("safetyNumberError");
 
         safetyNumberModal.classList.remove("hidden");
-        setSafetyTab("my");
         if (errEl) { errEl.classList.add("hidden"); errEl.textContent = ""; }
         if (grid) grid.textContent = "…";
-        _safetyNumberRaw = "";
         if (hint) {
             hint.textContent = "To verify end-to-end encryption with "
                 + chat.participant.name + ", compare numbers above with their device.";
@@ -2108,7 +1941,7 @@ function getVerifiedBadge(isVerified) {
         if (!window.ZChatE2EE) {
             if (grid) grid.textContent = "E2EE unavailable";
             if (errEl) {
-                errEl.textContent = "Missing js/e2ee.js";
+                errEl.textContent = "Missing js/e2ee.js — upload and hard refresh";
                 errEl.classList.remove("hidden");
             }
             return;
@@ -2141,7 +1974,6 @@ function getVerifiedBadge(isVerified) {
             }
 
             const num = await window.ZChatE2EE.generateSafetyNumber(myPub, partnerPub);
-            _safetyNumberRaw = num;
             if (grid) grid.innerHTML = formatSafetyGrid(num);
             await renderSafetyQr(num);
 
@@ -2160,7 +1992,6 @@ function getVerifiedBadge(isVerified) {
     }
 
     function closeSafetyNumberModal() {
-        stopSafetyScanner();
         if (safetyNumberModal) safetyNumberModal.classList.add("hidden");
     }
 
@@ -2176,16 +2007,6 @@ function getVerifiedBadge(isVerified) {
             if (e.target === safetyNumberModal) closeSafetyNumberModal();
         });
     }
-    if (safetyTabMyCode) safetyTabMyCode.addEventListener("click", () => setSafetyTab("my"));
-    if (safetyTabScan) safetyTabScan.addEventListener("click", () => setSafetyTab("scan"));
-    if (safetyScanFile) {
-        safetyScanFile.addEventListener("change", () => {
-            const f = safetyScanFile.files && safetyScanFile.files[0];
-            if (f) scanFromFile(f);
-            safetyScanFile.value = "";
-        });
-    }
-
     if (safetyMarkVerifiedBtn) {
         safetyMarkVerifiedBtn.addEventListener("click", async () => {
             if (!window.ZChatE2EE) return;
@@ -2205,16 +2026,15 @@ function getVerifiedBadge(isVerified) {
                 setTimeout(() => { safetyMarkVerifiedBtn.textContent = prev; }, 1500);
                 return;
             }
+
             const wasVerified = _safetyIsVerified;
             safetyMarkVerifiedBtn.textContent = "…";
             try {
-                const chat = state.chats.find((c) => c.id === state.activeChatId);
-                const partnerName = chat && chat.participant ? chat.participant.name : null;
                 if (wasVerified) {
                     await window.ZChatE2EE.unmarkUserAsVerified(_safetyPartnerId);
                     setVerifyBtnLabel(false);
                 } else {
-                    await window.ZChatE2EE.markUserAsVerified(_safetyPartnerId, null, partnerName);
+                    await window.ZChatE2EE.markUserAsVerified(_safetyPartnerId);
                     setVerifyBtnLabel(true);
                 }
             } catch (err) {
@@ -2726,56 +2546,104 @@ function getVerifiedBadge(isVerified) {
         }
     }
 
+    /**
+     * Upload ảnh chat lên Supabase Storage bucket `chat-images`.
+     * Trả về public URL (không dùng Base64).
+     */
+    async function uploadChatImage(file) {
+        if (!window.supabaseClient) {
+            console.error("[ZChat] supabaseClient missing — cannot upload image");
+            return null;
+        }
+        if (!file) return null;
+
+        const me = (currentUsername || localStorage.getItem("zchat_username") || "anon")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]/g, "_") || "anon";
+
+        const rawExt = (file.name && file.name.includes("."))
+            ? file.name.split(".").pop()
+            : (file.type && file.type.includes("/")) ? file.type.split("/").pop() : "jpg";
+        const ext = String(rawExt || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+
+        const path = me + "/" + Date.now() + "_" + Math.random().toString(36).slice(2, 10) + "." + ext;
+
+        const { data, error } = await window.supabaseClient.storage
+            .from("chat-images")
+            .upload(path, file, {
+                cacheControl: "3600",
+                upsert: false,
+                contentType: file.type || ("image/" + (ext === "jpg" ? "jpeg" : ext)),
+            });
+
+        if (error) {
+            console.error("[ZChat] upload chat-images:", error);
+            return null;
+        }
+
+        const uploadedPath = (data && (data.path || data.fullPath)) || path;
+        const { data: pub } = window.supabaseClient.storage
+            .from("chat-images")
+            .getPublicUrl(uploadedPath);
+
+        const url = pub && pub.publicUrl ? pub.publicUrl : null;
+        if (!url) {
+            console.error("[ZChat] getPublicUrl failed for", uploadedPath);
+            return null;
+        }
+        return url;
+    }
+
     if (fileInput) {
         fileInput.addEventListener("change", async (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
 
             const chat = state.chats.find((c) => c.id === state.activeChatId);
-            if (!chat) return;
+            if (!chat) {
+                fileInput.value = "";
+                return;
+            }
 
             if (file.type.startsWith("image/")) {
-                if (typeof uploadChatImage === "function") {
+                try {
                     const imageUrl = await uploadChatImage(file);
-                    if (imageUrl) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${imageUrl}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
+                    if (!imageUrl) {
+                        alert("Không upload được ảnh. Kiểm tra bucket chat-images (public) và quyền Storage.");
+                        fileInput.value = "";
+                        return;
                     }
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = function(evt) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${evt.target.result}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
+                    const msg = {
+                        id: uid("m"),
+                        senderId: "me",
+                        text: "[IMAGE]:" + imageUrl,
+                        createdAt: Date.now(),
+                        status: "sending",
                     };
-                    reader.readAsDataURL(file);
+                    chat.messages.push(msg);
+                    postMessageToSupabase(msg, chat.id);
+                    scheduleDisappearing(chat, msg);
+                    renderMessages(chat);
+                    renderChatList();
+                } catch (err) {
+                    console.error("[ZChat] image send failed:", err);
+                    alert("Gửi ảnh thất bại: " + (err && err.message ? err.message : "unknown"));
                 }
             } else {
-                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
+                const msg = {
+                    id: uid("m"),
+                    senderId: "me",
+                    text: "",
+                    attachment: file.name,
+                    createdAt: Date.now(),
+                    status: "sending",
+                };
                 chat.messages.push(msg);
                 postMessageToSupabase(msg, chat.id);
                 scheduleDisappearing(chat, msg);
-
                 renderMessages(chat);
                 renderChatList();
-
                 setTimeout(() => {
                     msg.status = "delivered";
                     if (state.activeChatId === chat.id) renderMessages(chat);
