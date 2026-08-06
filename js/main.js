@@ -2560,19 +2560,23 @@ function getVerifiedBadge(isVerified) {
 
             if (!meLower) return;
 
-            // Chỉ lấy về tin nhắn thuộc các đoạn chat có liên quan đến MÌNH:
-            // Saved Messages của mình, hoặc chat_id có chứa username của mình.
-            const { data, error } = await window.supabaseClient
+            // Chỉ cột cần thiết + giới hạn tin gần nhất (tránh tải cả lịch sử ~MB).
+            const MSG_LOAD_LIMIT = 400;
+            const { data: rawRows, error } = await window.supabaseClient
                 .from("messages")
-                .select("*")
+                .select("id, chat_id, sender_username, content, created_at, read_at")
                 .or(`chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
-                .order("created_at", { ascending: true });
+                .order("created_at", { ascending: false })
+                .limit(MSG_LOAD_LIMIT);
 
             if (error) {
                 console.error("[ZChat] load messages error:", error.message || JSON.stringify(error));
                 return;
             }
-            if (!data || !data.length) return;
+            if (!rawRows || !rawRows.length) return;
+
+            // Đảo lại thứ tự cũ → mới để xử lý / sort ổn định
+            const data = rawRows.slice().reverse();
 
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
