@@ -2560,14 +2560,15 @@ function getVerifiedBadge(isVerified) {
 
             if (!meLower) return;
 
-            // Chỉ cột cần thiết + giới hạn tin gần nhất (tránh tải cả lịch sử ~MB).
-            const MSG_LOAD_LIMIT = 400;
+            // Initial: KHÔNG lấy content (E2EE/base64 có thể vài MB/tin).
+            // Chỉ lấy metadata để dựng danh sách chat; content load khi mở chat.
+            const MSG_META_LIMIT = 200;
             const { data: rawRows, error } = await window.supabaseClient
                 .from("messages")
-                .select("id, chat_id, sender_username, content, created_at, read_at")
+                .select("id, chat_id, sender_username, created_at")
                 .or(`chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
                 .order("created_at", { ascending: false })
-                .limit(MSG_LOAD_LIMIT);
+                .limit(MSG_META_LIMIT);
 
             if (error) {
                 console.error("[ZChat] load messages error:", error.message || JSON.stringify(error));
@@ -2575,14 +2576,11 @@ function getVerifiedBadge(isVerified) {
             }
             if (!rawRows || !rawRows.length) return;
 
-            // Đảo lại thứ tự cũ → mới để xử lý / sort ổn định
             const data = rawRows.slice().reverse();
 
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
 
-                // Chặn lần cuối ở client: bỏ qua bất kỳ chat_id nào không thực sự thuộc về mình
-                // (phòng trường hợp query .or() ở trên bỏ sót định dạng chat_id lạ).
                 if (!isChatIdMine(chatId, meLower)) {
                     return;
                 }
@@ -2607,13 +2605,15 @@ function getVerifiedBadge(isVerified) {
                     state.chats.push(chat);
                 }
 
+                // Placeholder nhẹ cho list (preview đầy đủ khi mở chat / realtime)
                 if (!chat.messages.some((existing) => existing.id === m.id)) {
                     chat.messages.push({
                         id: m.id,
                         senderId: m.sender_username === me ? "me" : m.sender_username || "other",
-                        text: m.content || "",
+                        text: "",
                         createdAt: new Date(m.created_at).getTime(),
-                        status: m.read_at ? "read" : "delivered",
+                        status: "delivered",
+                        _metaOnly: true,
                     });
                 }
             });
@@ -2622,18 +2622,10 @@ function getVerifiedBadge(isVerified) {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
             });
 
+            // Preload keys only (no batch decrypt without content)
             if (window.ZChatE2EE) {
-                try {
-                    await window.ZChatE2EE.ensureUserKeys(me);
-                    const priv = window.ZChatE2EE.getLocalPrivateKey();
-                    if (priv) {
-                        const allMsgs = [];
-                        state.chats.forEach((c) => { c.messages.forEach((m) => allMsgs.push(m)); });
-                        await window.ZChatE2EE.decryptMessagesBatch(allMsgs, priv);
-                    }
-                } catch (e2eeErr) {
-                    console.error("[E2EE] batch decrypt:", e2eeErr);
-                }
+                try { await window.ZChatE2EE.ensureUserKeys(me); }
+                catch (e2eeErr) { console.error("[E2EE] ensure keys:", e2eeErr); }
             }
 
             renderChatList();
@@ -2648,8 +2640,59 @@ function getVerifiedBadge(isVerified) {
 
     async function loadMessagesForChat(chatId) {
         const chat = state.chats.find((c) => c.id === chatId);
-        if (chat && state.activeChatId === chatId) {
-            renderMessages(chat);
+        if (!chat || !window.supabaseClient || !chatId) {
+            if (chat && state.activeChatId === chatId) renderMessages(chat);
+            return;
+        }
+        // Đã có đủ tin gần đây thì không fetch lại (tránh spam khi chuyển tab)
+        if (chat._msgsFullyLoaded && chat.messages.length > 0) {
+            if (state.activeChatId === chatId) renderMessages(chat);
+            return;
+        }
+        try {
+            const me = currentUsername || localStorage.getItem("zchat_username") || "";
+            const CHAT_MSG_LIMIT = 80;
+            const { data: rawRows, error } = await window.supabaseClient
+                .from("messages")
+                .select("id, chat_id, sender_username, content, created_at, read_at")
+                .eq("chat_id", chatId)
+                .order("created_at", { ascending: false })
+                .limit(CHAT_MSG_LIMIT);
+            if (error) {
+                console.error("[ZChat] loadMessagesForChat:", error);
+                if (state.activeChatId === chatId) renderMessages(chat);
+                return;
+            }
+            const rows = (rawRows || []).slice().reverse();
+            // Xóa placeholder meta-only rồi nạp tin đủ content
+            chat.messages = chat.messages.filter((m) => !m._metaOnly);
+            rows.forEach((m) => {
+                if (chat.messages.some((existing) => existing.id === m.id)) return;
+                chat.messages.push({
+                    id: m.id,
+                    senderId: m.sender_username === me ? "me" : m.sender_username || "other",
+                    text: m.content || "",
+                    createdAt: new Date(m.created_at).getTime(),
+                    status: m.read_at ? "read" : "delivered",
+                });
+            });
+            chat.messages.sort((a, b) => a.createdAt - b.createdAt);
+            chat._msgsFullyLoaded = true;
+
+            if (window.ZChatE2EE) {
+                try {
+                    await window.ZChatE2EE.ensureUserKeys(me);
+                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                    if (priv) await window.ZChatE2EE.decryptMessagesBatch(chat.messages, priv);
+                } catch (e2eeErr) {
+                    console.error("[E2EE] chat decrypt:", e2eeErr);
+                }
+            }
+            if (state.activeChatId === chatId) renderMessages(chat);
+            renderChatList();
+        } catch (err) {
+            console.error("[ZChat] loadMessagesForChat exception:", err);
+            if (state.activeChatId === chatId) renderMessages(chat);
         }
     }
 
