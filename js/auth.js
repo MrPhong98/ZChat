@@ -54,8 +54,16 @@ function saveSession(user, opts) {
     if (user.recovery_password) {
         localStorage.setItem("zchat_recovery_password", user.recovery_password);
     }
-    if (user.public_key) localStorage.setItem("zchat_public_key", user.public_key);
-    if (user.private_key) localStorage.setItem("zchat_private_key", user.private_key);
+    // E2EE keys chỉ trên server (users.public_key / private_key) + RAM qua ensureUserKeys
+    if (user.public_key || user.private_key) {
+        try {
+            localStorage.removeItem("zchat_public_key");
+            localStorage.removeItem("zchat_private_key");
+        } catch (_) {}
+        if (window.ZChatE2EE && typeof window.ZChatE2EE.cacheKeysLocally === "function") {
+            window.ZChatE2EE.cacheKeysLocally(user.public_key || "", user.private_key || "");
+        }
+    }
     if (user.id) localStorage.setItem("zchat_user_id", user.id);
     localStorage.setItem("zchat_user", JSON.stringify(user));
 }

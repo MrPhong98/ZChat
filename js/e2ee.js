@@ -70,34 +70,49 @@
         _cachedPrivJwk = str; _cachedPrivKey = key;
         return key;
     }
+    // Chỉ giữ key trong RAM phiên làm việc — nguồn sự thật là users.public_key / users.private_key trên Supabase
+    let _memPublicKey = "";
+    let _memPrivateKey = "";
+
     function cacheKeysLocally(publicKey, privateKey) {
-        if (publicKey) localStorage.setItem("zchat_public_key", jwkToString(publicKey));
-        if (privateKey) localStorage.setItem("zchat_private_key", jwkToString(privateKey));
+        if (publicKey) _memPublicKey = jwkToString(publicKey);
+        if (privateKey) _memPrivateKey = jwkToString(privateKey);
         _cachedPrivJwk = _cachedPrivKey = _cachedPubJwk = _cachedPubKey = null;
+        // Không ghi localStorage — key chỉ lưu trên server
+        try {
+            localStorage.removeItem("zchat_public_key");
+            localStorage.removeItem("zchat_private_key");
+        } catch (_) {}
     }
-    function getLocalPrivateKey() { return localStorage.getItem("zchat_private_key") || ""; }
-    function getLocalPublicKey() { return localStorage.getItem("zchat_public_key") || ""; }
+    function getLocalPrivateKey() { return _memPrivateKey || ""; }
+    function getLocalPublicKey() { return _memPublicKey || ""; }
 
     async function ensureUserKeys(username, existingUserRow) {
         if (!global.supabaseClient || !username) {
             return { publicKey: getLocalPublicKey(), privateKey: getLocalPrivateKey() };
         }
         let row = existingUserRow;
-        if (!row) {
-            const { data } = await global.supabaseClient
+        if (!row || !row.public_key || !row.private_key) {
+            const { data, error } = await global.supabaseClient
                 .from("users").select("username, public_key, private_key, id")
                 .ilike("username", username).maybeSingle();
-            row = data;
+            if (error) console.error("[E2EE] load keys:", error);
+            if (data) row = data;
         }
         if (row && row.public_key && row.private_key) {
             cacheKeysLocally(row.public_key, row.private_key);
+            if (row.id) {
+                try { localStorage.setItem("zchat_user_id", row.id); } catch (_) {}
+            }
             return { publicKey: row.public_key, privateKey: row.private_key, userId: row.id };
         }
+        // Chưa có key trên server → tạo mới và lưu vào public.users
         const pair = await generateKeyPairJwk();
-        const { error } = await global.supabaseClient
-            .from("users").update({ public_key: pair.publicKey, private_key: pair.privateKey })
+        const { error: upErr } = await global.supabaseClient
+            .from("users")
+            .update({ public_key: pair.publicKey, private_key: pair.privateKey })
             .ilike("username", username);
-        if (error) console.error("[E2EE] save keys:", error);
+        if (upErr) console.error("[E2EE] save keys to users:", upErr);
         cacheKeysLocally(pair.publicKey, pair.privateKey);
         return { publicKey: pair.publicKey, privateKey: pair.privateKey, userId: row && row.id };
     }
@@ -214,7 +229,7 @@
             );
             const bytes = new Uint8Array(hashBuf);
             let digits = "";
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 15; i++) {
                 digits += String(bytes[i] % 10);
                 digits += String(Math.floor(bytes[i] / 10) % 10);
             }
