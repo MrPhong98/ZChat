@@ -1109,7 +1109,7 @@ function getVerifiedBadge(isVerified) {
         if (window.supabaseClient) {
             try {
                 const { error } = await window.supabaseClient
-                    .rpc("clear_conversation", { p_conversation_id: chatId });
+                    .rpc("clear_conversation", { p_chat_id: chatId });
                 if (error) console.error("[ZChat] clearConversation error:", error);
             } catch (err) {
                 console.error("[ZChat] clearConversation exception:", err);
@@ -1340,7 +1340,7 @@ function getVerifiedBadge(isVerified) {
             const { error } = await window.supabaseClient
                 .from("messages")
                 .update({ read_at: new Date().toISOString() })
-                .eq("conversation_id", chatId)
+                .eq("chat_id", chatId)
                 .neq("sender_username", me)
                 .is("read_at", null);
             if (error) console.error("[ZChat] markChatAsRead error:", error);
@@ -2706,29 +2706,37 @@ function getVerifiedBadge(isVerified) {
             const MSG_META_LIMIT = 200;
             const myId = await getMyUserId();
 
-            // Conversation uuid của mình (user_1 / user_2)
+            // chat_id trên messages = UUID (public.conversations.id)
+            // Cần SELECT được bảng conversations; nếu 403 thì chỉ còn legacy saved/chat_*
             let convIds = [];
             if (myId) {
                 try {
-                    const { data: convs } = await window.supabaseClient
+                    const { data: convs, error: convErr } = await window.supabaseClient
                         .from("conversations")
                         .select("id, user_1, user_2")
                         .or(`user_1.eq.${myId},user_2.eq.${myId}`);
-                    convIds = (convs || []).map((c) => c.id).filter(Boolean);
+                    if (convErr) {
+                        console.error(
+                            "[ZChat] conversations 403/RLS — chạy GRANT SELECT ON conversations TO anon, authenticated. Chi tiết:",
+                            convErr.message || convErr
+                        );
+                    } else {
+                        convIds = (convs || []).map((c) => c.id).filter(Boolean);
+                    }
                 } catch (convErr) {
                     console.warn("[ZChat] load conversations:", convErr);
                 }
             }
 
-            // Legacy + saved + conversation ids
-            let orFilter = `conversation_id.eq.${mySavedChatId},conversation_id.ilike.chat_${meLower}_%,conversation_id.ilike.chat_%_${meLower}`;
+            // Filter: UUID conversation + legacy (saved_ / chat_user_user)
+            let orFilter = `chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`;
             convIds.forEach((id) => {
-                orFilter += `,conversation_id.eq.${id}`;
+                orFilter += `,chat_id.eq.${id}`;
             });
 
             const { data: rawRows, error } = await window.supabaseClient
                 .from("messages")
-                .select("id, conversation_id, sender_username, created_at")
+                .select("id, chat_id, sender_username, created_at")
                 .or(orFilter)
                 .order("created_at", { ascending: false })
                 .limit(MSG_META_LIMIT);
@@ -2743,7 +2751,7 @@ function getVerifiedBadge(isVerified) {
             const pendingNameResolves = [];
 
             data.forEach((m) => {
-                const chatId = m.conversation_id || mySavedChatId;
+                const chatId = m.chat_id || mySavedChatId;
 
                 if (!isChatIdMine(chatId, meLower) && !(isUuid(chatId) && convIds.includes(chatId))) {
                     return;
@@ -2832,8 +2840,8 @@ function getVerifiedBadge(isVerified) {
             const CHAT_MSG_LIMIT = 80;
             const { data: rawRows, error } = await window.supabaseClient
                 .from("messages")
-                .select("id, conversation_id, sender_username, content, created_at, read_at")
-                .eq("conversation_id", chatId)
+                .select("id, chat_id, sender_username, content, created_at, read_at")
+                .eq("chat_id", chatId)
                 .order("created_at", { ascending: false })
                 .limit(CHAT_MSG_LIMIT);
             if (error) {
@@ -2941,7 +2949,7 @@ function getVerifiedBadge(isVerified) {
 
         const row = {
             id: makeUuid(),
-            conversation_id: realChatId,
+            chat_id: realChatId,
             sender_username: msgObj.senderId === "me" ? me : String(msgObj.senderId || me),
             content: contentToStore,
             created_at: new Date(msgObj.createdAt || Date.now()).toISOString(),
@@ -3035,7 +3043,7 @@ function getVerifiedBadge(isVerified) {
     }
 
     /* ============ REALTIME (phải nằm trong IIFE để dùng được state) ============ */
-    /* Kiểm tra 1 conversation_id có thực sự thuộc về "me" hay không, tránh việc user khác
+    /* Kiểm tra 1 chat_id có thực sự thuộc về "me" hay không, tránh việc user khác
        vô tình (hoặc realtime broadcast) làm lộ / gộp nhầm đoạn chat của 2 người khác. */
     function isChatIdMine(chatId, meLower) {
         if (!chatId || !meLower) return false;
@@ -3108,7 +3116,7 @@ function getVerifiedBadge(isVerified) {
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
                         const mySavedChatId = `saved_${meLower}`;
-                        const chatId = newMsg.conversation_id || mySavedChatId;
+                        const chatId = newMsg.chat_id || mySavedChatId;
 
                         // Chặn: chỉ nhận chat của mình (legacy / saved / conversation uuid đã verify)
                         if (!meLower) return;
@@ -3196,7 +3204,7 @@ function getVerifiedBadge(isVerified) {
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.conversation_id || `saved_${meLower}`;
+                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
 
                         // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
                         if (!meLower || !isChatIdMine(chatId, meLower)) return;
@@ -3229,7 +3237,7 @@ function getVerifiedBadge(isVerified) {
                 { event: "DELETE", schema: "public", table: "messages" },
                 (payload) => {
                     try {
-                        // Mặc định Supabase chỉ gửi kèm "id" trong payload.old (không có conversation_id),
+                        // Mặc định Supabase chỉ gửi kèm "id" trong payload.old (không có chat_id),
                         // nên mình tìm trực tiếp trong state.chats — vốn đã chỉ chứa chat của MÌNH rồi,
                         // nên không lo lộ/xoá nhầm tin nhắn của người khác.
                         const deletedId = payload.old && payload.old.id;
