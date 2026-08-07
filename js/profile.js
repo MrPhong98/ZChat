@@ -231,7 +231,7 @@
         }
     }
 
-    /** User id ổn định — path Storage không phụ thuộc username */
+    /** Lấy user id (UUID) — path Storage không phụ thuộc username */
     async function resolveAccountUserId() {
         const cached = localStorage.getItem("zchat_user_id");
         if (cached) return cached;
@@ -519,7 +519,7 @@
                 }
 
                 const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-                // Path theo user id + timestamp → URL mới mỗi lần upload (tránh cache ảnh cũ)
+                // Path theo user id + timestamp → URL mới mỗi lần (tránh cache ảnh cũ)
                 const path = `${userId}/avatar_${Date.now()}.${ext}`;
 
                 const { error: uploadErr } = await window.supabaseClient
@@ -537,7 +537,7 @@
                 const publicUrl = publicUrlData && publicUrlData.publicUrl;
                 if (!publicUrl) throw new Error("Could not get public URL");
 
-                // Lưu URL kèm version → mọi thiết bị/trình duyệt load ảnh mới, không cache URL cũ
+                // Lưu URL kèm version → mọi thiết bị load ảnh mới
                 const versionedUrl = `${publicUrl}?v=${Date.now()}`;
                 draft.avatarType = "photo";
                 draft.avatarUrl = versionedUrl;
@@ -636,7 +636,7 @@
         // Lưu avatar vào tài khoản trên Supabase (đồng bộ PC / điện thoại / trình duyệt)
         if (window.supabaseClient) {
             try {
-                // Giữ nguyên URL (kể cả ?v=) — không cắt query, tránh load lại ảnh cũ từ cache
+                // Giữ nguyên URL (kể cả ?v=) — không cắt query
                 const avatarUrlToSave = draft.avatarUrl || null;
                 const accountKey = savedUsername || name;
                 const { data: updatedRows, error } = await window.supabaseClient
