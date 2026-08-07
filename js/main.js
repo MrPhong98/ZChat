@@ -2762,6 +2762,34 @@ function getVerifiedBadge(isVerified) {
         }
     }
 
+    /* Upload ảnh chat → Supabase Storage bucket "chat-images" (public URL) */
+    async function uploadChatImage(file) {
+        if (!window.supabaseClient || !file) return null;
+        try {
+            const me = (currentUsername || localStorage.getItem("zchat_username") || "user").trim().toLowerCase();
+            const ext = (file.name && file.name.split(".").pop()) || "jpg";
+            const safeExt = String(ext).replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "jpg";
+            const path = `${me}/${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${safeExt}`;
+
+            const { error: upErr } = await window.supabaseClient.storage
+                .from("chat-images")
+                .upload(path, file, {
+                    cacheControl: "3600",
+                    upsert: false,
+                    contentType: file.type || "image/jpeg",
+                });
+            if (upErr) {
+                console.error("[ZChat] uploadChatImage error:", upErr);
+                return null;
+            }
+            const { data } = window.supabaseClient.storage.from("chat-images").getPublicUrl(path);
+            return (data && data.publicUrl) || null;
+        } catch (err) {
+            console.error("[ZChat] uploadChatImage exception:", err);
+            return null;
+        }
+    }
+
     if (fileInput) {
         fileInput.addEventListener("change", async (e) => {
             const file = e.target.files && e.target.files[0];
@@ -2771,37 +2799,21 @@ function getVerifiedBadge(isVerified) {
             if (!chat) return;
 
             if (file.type.startsWith("image/")) {
-                if (typeof uploadChatImage === "function") {
-                    const imageUrl = await uploadChatImage(file);
-                    if (imageUrl) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${imageUrl}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
-                    }
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = function(evt) {
-                        const msg = {
-                            id: uid("m"),
-                            senderId: "me",
-                            text: `[IMAGE]:${evt.target.result}`,
-                            createdAt: Date.now(),
-                            status: "sending"
-                        };
-                        chat.messages.push(msg);
-                        postMessageToSupabase(msg, chat.id);
-                        renderMessages(chat);
-                        renderChatList();
+                const imageUrl = await uploadChatImage(file);
+                if (imageUrl) {
+                    const msg = {
+                        id: uid("m"),
+                        senderId: "me",
+                        text: `[IMAGE]:${imageUrl}`,
+                        createdAt: Date.now(),
+                        status: "sending"
                     };
-                    reader.readAsDataURL(file);
+                    chat.messages.push(msg);
+                    postMessageToSupabase(msg, chat.id);
+                    renderMessages(chat);
+                    renderChatList();
+                } else {
+                    console.error("[ZChat] Image upload failed — no public URL");
                 }
             } else {
                 const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
