@@ -406,7 +406,7 @@ function getVerifiedBadge(isVerified) {
         try {
             const { data, error } = await window.supabaseClient
                 .from("users")
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
+                .select("id, username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
                 .ilike("username", username)
                 .maybeSingle();
             if (error) {
@@ -418,6 +418,127 @@ function getVerifiedBadge(isVerified) {
             console.error("[ZChat] fetchAvatarForUsername exception:", err);
             return null;
         }
+    }
+
+    /* ============ CONVERSATIONS 1-1 (bảng public.conversations: user_1, user_2) ============ */
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    function isUuid(v) {
+        return typeof v === "string" && UUID_RE.test(v);
+    }
+
+    /** Cache user id của mình + map conversationId → otherUsername */
+    let myUserIdCache = localStorage.getItem("zchat_user_id") || null;
+    const conversationOtherName = Object.create(null); // { [convId]: username }
+
+    async function resolveUserIdByUsername(username) {
+        if (!window.supabaseClient || !username) return null;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("id, username")
+                .ilike("username", username)
+                .maybeSingle();
+            if (error || !data || !data.id) return null;
+            return data.id;
+        } catch (err) {
+            console.error("[ZChat] resolveUserIdByUsername:", err);
+            return null;
+        }
+    }
+
+    async function getMyUserId() {
+        if (myUserIdCache) return myUserIdCache;
+        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
+        if (!me) return null;
+        const id = await resolveUserIdByUsername(me);
+        if (id) {
+            myUserIdCache = id;
+            localStorage.setItem("zchat_user_id", id);
+        }
+        return id;
+    }
+
+    /**
+     * Tạo / lấy id phòng chat 1-1 từ 2 user UUID.
+     * Ưu tiên RPC get_or_create_conversation; fallback insert/select bảng conversations.
+     */
+    async function getOrCreateConversationId(myUserId, otherUserId) {
+        if (!window.supabaseClient || !myUserId || !otherUserId) return null;
+        if (myUserId === otherUserId) return null;
+
+        // Thử RPC (nếu đã tạo function trên Supabase)
+        try {
+            const { data: rpcId, error: rpcErr } = await window.supabaseClient.rpc(
+                "get_or_create_conversation",
+                { p_user_a: myUserId, p_user_b: otherUserId }
+            );
+            if (!rpcErr && rpcId) return rpcId;
+            if (rpcErr) console.warn("[ZChat] RPC get_or_create_conversation:", rpcErr.message || rpcErr);
+        } catch (_) { /* fallback */ }
+
+        // Fallback client: chuẩn hóa user_1 < user_2 (so text UUID)
+        const u1 = myUserId < otherUserId ? myUserId : otherUserId;
+        const u2 = myUserId < otherUserId ? otherUserId : myUserId;
+
+        try {
+            const { data: existing, error: selErr } = await window.supabaseClient
+                .from("conversations")
+                .select("id")
+                .eq("user_1", u1)
+                .eq("user_2", u2)
+                .maybeSingle();
+            if (!selErr && existing && existing.id) return existing.id;
+
+            const { data: created, error: insErr } = await window.supabaseClient
+                .from("conversations")
+                .insert([{ user_1: u1, user_2: u2 }])
+                .select("id")
+                .maybeSingle();
+            if (!insErr && created && created.id) return created.id;
+
+            // Race: insert trùng → select lại
+            if (insErr) {
+                const { data: again } = await window.supabaseClient
+                    .from("conversations")
+                    .select("id")
+                    .eq("user_1", u1)
+                    .eq("user_2", u2)
+                    .maybeSingle();
+                if (again && again.id) return again.id;
+                console.error("[ZChat] create conversation failed:", insErr);
+            }
+        } catch (err) {
+            console.error("[ZChat] getOrCreateConversationId exception:", err);
+        }
+        return null;
+    }
+
+    /** Resolve username đối phương từ conversation uuid (user_1 / user_2) */
+    async function resolveOtherNameFromConversationId(convId, meId) {
+        if (!window.supabaseClient || !convId) return null;
+        if (conversationOtherName[convId]) return conversationOtherName[convId];
+        try {
+            const { data: conv, error } = await window.supabaseClient
+                .from("conversations")
+                .select("user_1, user_2")
+                .eq("id", convId)
+                .maybeSingle();
+            if (error || !conv) return null;
+            const otherId = conv.user_1 === meId ? conv.user_2 : conv.user_1;
+            if (!otherId) return null;
+            const { data: user } = await window.supabaseClient
+                .from("users")
+                .select("username")
+                .eq("id", otherId)
+                .maybeSingle();
+            if (user && user.username) {
+                conversationOtherName[convId] = user.username;
+                return user.username;
+            }
+        } catch (err) {
+            console.error("[ZChat] resolveOtherNameFromConversationId:", err);
+        }
+        return null;
     }
 
     /* Lấy avatar cho tất cả participant hiện có trong state.chats.
@@ -2461,11 +2582,13 @@ function getVerifiedBadge(isVerified) {
         let matchedName = rawName;
         let matchedAvatarRow = null;
 
+        let matchedUserId = null;
+
         if (window.supabaseClient) {
             try {
                 const { data: userData, error } = await window.supabaseClient
                     .from("users")
-                    .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
+                    .select("id, username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
                     .ilike("username", rawName)
                     .maybeSingle();
 
@@ -2477,6 +2600,7 @@ function getVerifiedBadge(isVerified) {
                     userFound = true;
                     matchedName = userData.username;
                     matchedAvatarRow = userData;
+                    matchedUserId = userData.id || null;
                 }
             } catch (err) {
                 console.error("[ZChat] Lỗi kết nối khi tìm user:", err);
@@ -2496,19 +2620,31 @@ function getVerifiedBadge(isVerified) {
         if (!userFound) {
             let errEl = document.getElementById("newChatError");
             if (!errEl) {
-                // Nếu chưa có thẻ hiển thị lỗi thì tạo nhanh một thẻ nhỏ màu đỏ dưới ô input
                 errEl = document.createElement("p");
                 errEl.id = "newChatError";
                 errEl.className = "text-red-500 text-xs mt-1.5 font-medium";
                 newChatNameInput.parentNode.appendChild(errEl);
             }
-            errEl.textContent = "No User found!"; // Chuyển thành No User found cực kỳ chuyên nghiệp
+            errEl.textContent = "No User found!";
             newChatNameInput.focus();
             return;
         }
-        // Tạo Chat ID cố định ghép từ tên 2 người theo thứ tự bảng chữ cái (tránh bị dính c_saved hoặc id ngẫu nhiên)
-        const sortedUsers = [currentUser.toLowerCase(), matchedName.toLowerCase()].sort();
-        const targetChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
+
+        // Phòng chat 1-1: id từ bảng conversations (user_1 + user_2 UUID)
+        let targetChatId = null;
+        const myId = await getMyUserId();
+        if (!matchedUserId && matchedName) {
+            matchedUserId = await resolveUserIdByUsername(matchedName);
+        }
+        if (myId && matchedUserId) {
+            targetChatId = await getOrCreateConversationId(myId, matchedUserId);
+            if (targetChatId) conversationOtherName[targetChatId] = matchedName;
+        }
+        // Fallback legacy nếu chưa có conversations / user id
+        if (!targetChatId) {
+            const sortedUsers = [currentUser.toLowerCase(), matchedName.toLowerCase()].sort();
+            targetChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
+        }
 
         let chat = state.chats.find(
             c => c.id === targetChatId || c.participant.name.toLowerCase() === matchedName.toLowerCase()
@@ -2517,7 +2653,13 @@ function getVerifiedBadge(isVerified) {
         if (!chat) {
             chat = {
                 id: targetChatId,
-                participant: { id: uid("u"), name: matchedName, online: true, lastSeen: null },
+                participant: {
+                    id: matchedUserId || uid("u"),
+                    name: matchedName,
+                    userId: matchedUserId || null,
+                    online: true,
+                    lastSeen: null,
+                },
                 unread: 0,
                 disappearingTime: "off",
                 blockScreenshots: false,
@@ -2526,7 +2668,8 @@ function getVerifiedBadge(isVerified) {
             if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
             state.chats.unshift(chat);
         } else {
-            chat.id = targetChatId; // Đồng bộ chuẩn ID
+            chat.id = targetChatId;
+            if (matchedUserId) chat.participant.userId = matchedUserId;
             if (matchedAvatarRow) applyAvatarFields(chat.participant, matchedAvatarRow);
         }
 
@@ -2560,13 +2703,33 @@ function getVerifiedBadge(isVerified) {
 
             if (!meLower) return;
 
-            // Initial: KHÔNG lấy content (E2EE/base64 có thể vài MB/tin).
-            // Chỉ lấy metadata để dựng danh sách chat; content load khi mở chat.
             const MSG_META_LIMIT = 200;
+            const myId = await getMyUserId();
+
+            // Conversation uuid của mình (user_1 / user_2)
+            let convIds = [];
+            if (myId) {
+                try {
+                    const { data: convs } = await window.supabaseClient
+                        .from("conversations")
+                        .select("id, user_1, user_2")
+                        .or(`user_1.eq.${myId},user_2.eq.${myId}`);
+                    convIds = (convs || []).map((c) => c.id).filter(Boolean);
+                } catch (convErr) {
+                    console.warn("[ZChat] load conversations:", convErr);
+                }
+            }
+
+            // Legacy + saved + conversation ids
+            let orFilter = `chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`;
+            convIds.forEach((id) => {
+                orFilter += `,chat_id.eq.${id}`;
+            });
+
             const { data: rawRows, error } = await window.supabaseClient
                 .from("messages")
                 .select("id, chat_id, sender_username, created_at")
-                .or(`chat_id.eq.${mySavedChatId},chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
+                .or(orFilter)
                 .order("created_at", { ascending: false })
                 .limit(MSG_META_LIMIT);
 
@@ -2577,18 +2740,23 @@ function getVerifiedBadge(isVerified) {
             if (!rawRows || !rawRows.length) return;
 
             const data = rawRows.slice().reverse();
+            const pendingNameResolves = [];
 
             data.forEach((m) => {
                 const chatId = m.chat_id || mySavedChatId;
 
-                if (!isChatIdMine(chatId, meLower)) {
+                if (!isChatIdMine(chatId, meLower) && !(isUuid(chatId) && convIds.includes(chatId))) {
                     return;
                 }
 
                 let chat = state.chats.find((c) => c.id === chatId);
 
                 if (!chat) {
-                    const otherName = resolveOtherNameFromChatId(chatId, me, m.sender_username);
+                    let otherName = resolveOtherNameFromChatId(chatId, me, m.sender_username);
+                    if (isUuid(chatId) && (otherName === "Chat User" || !otherName)) {
+                        otherName = conversationOtherName[chatId] || otherName;
+                        pendingNameResolves.push({ chatId, meId: myId });
+                    }
                     chat = {
                         id: chatId,
                         participant: {
@@ -2605,7 +2773,6 @@ function getVerifiedBadge(isVerified) {
                     state.chats.push(chat);
                 }
 
-                // Placeholder nhẹ cho list (preview đầy đủ khi mở chat / realtime)
                 if (!chat.messages.some((existing) => existing.id === m.id)) {
                     chat.messages.push({
                         id: m.id,
@@ -2618,11 +2785,22 @@ function getVerifiedBadge(isVerified) {
                 }
             });
 
+            // Resolve tên đối phương cho conversation uuid
+            await Promise.all(
+                pendingNameResolves.map(async ({ chatId, meId }) => {
+                    const name = await resolveOtherNameFromConversationId(chatId, meId);
+                    if (!name) return;
+                    const chat = state.chats.find((c) => c.id === chatId);
+                    if (chat && (chat.participant.name === "Chat User" || !chat.participant.name)) {
+                        chat.participant.name = name;
+                    }
+                })
+            );
+
             state.chats.forEach((c) => {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
             });
 
-            // Preload keys only (no batch decrypt without content)
             if (window.ZChatE2EE) {
                 try { await window.ZChatE2EE.ensureUserKeys(me); }
                 catch (e2eeErr) { console.error("[E2EE] ensure keys:", e2eeErr); }
@@ -2707,15 +2885,37 @@ function getVerifiedBadge(isVerified) {
         let realChatId = chatId;
 
         // Nếu là Saved Messages hoặc gửi cho chính mình
-        if (!currentChat || currentChat.participant.name === "Saved Messages" || chatId.startsWith("saved_")) {
+        if (!currentChat || currentChat.participant.name === "Saved Messages" || String(chatId).startsWith("saved_")) {
             realChatId = `saved_${me.toLowerCase()}`;
+        } else if (isUuid(chatId)) {
+            // Đã là conversation uuid
+            realChatId = chatId;
         } else {
-            // Nếu gửi cho người dùng khác, tự động tạo/chuẩn hóa ID dạng chat_userA_userB (sắp xếp A-Z)
-            const otherUser = currentChat.participant.name.trim();
-            const sortedUsers = [me.toLowerCase(), otherUser.toLowerCase()].sort();
-            realChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
-            currentChat.id = realChatId;
-            state.activeChatId = realChatId;
+            // Tạo / lấy conversation id từ 2 user UUID
+            const otherUser = (currentChat.participant.name || "").trim();
+            const myId = await getMyUserId();
+            let otherId = currentChat.participant.userId || null;
+            if (!otherId && otherUser) otherId = await resolveUserIdByUsername(otherUser);
+
+            if (myId && otherId) {
+                const convId = await getOrCreateConversationId(myId, otherId);
+                if (convId) {
+                    realChatId = convId;
+                    conversationOtherName[convId] = otherUser;
+                    if (currentChat.id !== convId) {
+                        currentChat.id = convId;
+                        currentChat.participant.userId = otherId;
+                        if (state.activeChatId === chatId) state.activeChatId = convId;
+                    }
+                }
+            }
+            // Fallback legacy nếu chưa resolve được UUID
+            if (!isUuid(realChatId)) {
+                const sortedUsers = [me.toLowerCase(), otherUser.toLowerCase()].sort();
+                realChatId = `chat_${sortedUsers[0]}_${sortedUsers[1]}`;
+                currentChat.id = realChatId;
+                if (state.activeChatId === chatId) state.activeChatId = realChatId;
+            }
         }
 
         let contentToStore = msgObj.text || msgObj.attachment || "";
@@ -2844,7 +3044,31 @@ function getVerifiedBadge(isVerified) {
             const rest = chatId.slice(5);
             return rest === meLower || rest.startsWith(meLower + "_") || rest.endsWith("_" + meLower);
         }
+        // Conversation uuid: chỉ khi đã biết (cache / state) — realtime sẽ verify thêm
+        if (isUuid(chatId)) {
+            if (conversationOtherName[chatId]) return true;
+            if (state.chats.some((c) => c.id === chatId)) return true;
+            return false;
+        }
         return false;
+    }
+
+    async function isConversationMineAsync(chatId) {
+        if (!isUuid(chatId) || !window.supabaseClient) return false;
+        if (isChatIdMine(chatId, (currentUsername || "").toLowerCase())) return true;
+        const myId = await getMyUserId();
+        if (!myId) return false;
+        try {
+            const { data } = await window.supabaseClient
+                .from("conversations")
+                .select("id")
+                .eq("id", chatId)
+                .or(`user_1.eq.${myId},user_2.eq.${myId}`)
+                .maybeSingle();
+            return !!(data && data.id);
+        } catch (_) {
+            return false;
+        }
     }
 
     function resolveOtherNameFromChatId(chatId, me, senderUsername) {
@@ -2857,6 +3081,9 @@ function getVerifiedBadge(isVerified) {
             if (meL && rest.endsWith("_" + meL)) return rest.slice(0, -(meL.length + 1));
             const other = rest.split("_").find((p) => p && p !== meL);
             if (other) return other;
+        }
+        if (isUuid(chatId) && conversationOtherName[chatId]) {
+            return conversationOtherName[chatId];
         }
         if (senderUsername && senderUsername.toLowerCase() !== meL) return senderUsername;
         return "Chat User";
@@ -2883,15 +3110,24 @@ function getVerifiedBadge(isVerified) {
                         const mySavedChatId = `saved_${meLower}`;
                         const chatId = newMsg.chat_id || mySavedChatId;
 
-                        // Chặn triệt để: bỏ qua bất kỳ tin nhắn nào không thuộc về chat của MÌNH,
-                        // dù là Saved Messages của người khác hay đoạn chat 1-1 của 2 người khác.
-                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+                        // Chặn: chỉ nhận chat của mình (legacy / saved / conversation uuid đã verify)
+                        if (!meLower) return;
+                        let mine = isChatIdMine(chatId, meLower);
+                        if (!mine && isUuid(chatId)) {
+                            mine = await isConversationMineAsync(chatId);
+                        }
+                        if (!mine) return;
 
                         let chat = state.chats.find((c) => c.id === chatId);
 
                         // Chưa có chat → tạo mới (không cần reload)
                         if (!chat) {
-                            const otherName = resolveOtherNameFromChatId(chatId, me, newMsg.sender_username);
+                            let otherName = resolveOtherNameFromChatId(chatId, me, newMsg.sender_username);
+                            if (isUuid(chatId) && (otherName === "Chat User" || !otherName)) {
+                                const myId = await getMyUserId();
+                                const resolved = await resolveOtherNameFromConversationId(chatId, myId);
+                                if (resolved) otherName = resolved;
+                            }
                             chat = {
                                 id: chatId,
                                 participant: {
