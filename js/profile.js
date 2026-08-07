@@ -231,16 +231,38 @@
         }
     }
 
+    /** Lấy user id (UUID) — đặt tên file Storage ổn định khi đổi username */
+    async function resolveAccountUserId() {
+        const cached = localStorage.getItem("zchat_user_id");
+        if (cached) return cached;
+        if (!window.supabaseClient || !savedUsername) return null;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("id")
+                .ilike("username", savedUsername)
+                .maybeSingle();
+            if (error || !data || !data.id) return null;
+            localStorage.setItem("zchat_user_id", data.id);
+            return data.id;
+        } catch (err) {
+            console.error("[ZChat] resolveAccountUserId error:", err);
+            return null;
+        }
+    }
+
     /** Avatar gắn với tài khoản — fetch từ server để đồng bộ mọi thiết bị */
     async function loadAvatarFromAccount() {
         if (!window.supabaseClient || !savedUsername) return;
         try {
             const { data, error } = await window.supabaseClient
                 .from("users")
-                .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                .select("id, username, avatar_type, avatar_color, avatar_emoji, avatar_url")
                 .ilike("username", savedUsername)
                 .maybeSingle();
             if (error || !data) return;
+
+            if (data.id) localStorage.setItem("zchat_user_id", data.id);
 
             if (data.avatar_type) {
                 draft.avatarType = saved.avatarType = data.avatar_type;
@@ -491,8 +513,15 @@
 
             setUploadingState(true);
             try {
-                const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-                const path = `${sanitizeForPath(draft.username || savedUsername)}.${ext}`;
+                // Path theo user id (không theo username) → đổi tên tài khoản không làm mất ảnh
+                const userId = await resolveAccountUserId();
+                if (!userId) {
+                    throw new Error("Could not resolve account id. Please re-login and try again.");
+                }
+
+                const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+                // Cố định tên file theo id → upsert luôn ghi đè cùng object
+                const path = `${userId}/avatar.${ext}`;
 
                 const { error: uploadErr } = await window.supabaseClient
                     .storage
