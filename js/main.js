@@ -1689,23 +1689,19 @@ function getVerifiedBadge(isVerified) {
             renderChatList();
         }
 
-        // Chỉ xóa DB khi id là UUID server (tin đã sync)
-        if (window.supabaseClient && msgId && isUuid(String(msgId))) {
+        if (window.supabaseClient) {
             try {
-                const { error, count } = await window.supabaseClient
+                const { error } = await window.supabaseClient
                     .from("messages")
-                    .delete({ count: "exact" })
+                    .delete()
                     .eq("id", msgId);
+
                 if (error) {
                     console.error("[ZChat] Delete message error:", error);
-                } else {
-                    console.log("[ZChat] Deleted message from DB:", msgId, "count:", count);
                 }
             } catch (err) {
                 console.error("[ZChat] Delete exception:", err);
             }
-        } else {
-            console.warn("[ZChat] Delete skip DB — invalid or local-only id:", msgId);
         }
     }
 
@@ -2462,49 +2458,24 @@ function getVerifiedBadge(isVerified) {
         if (editingMsgId) {
             const msg = chat.messages.find((m) => m.id === editingMsgId);
             if (msg) {
+                // Giữ nguyên phần "đang trả lời ai" (nếu có) khi sửa nội dung
                 const { replyId, replySender, replyPreview } = parseReply(msg.text || "");
                 const newText = replyId ? buildReplyPrefix(replyId, replySender, replyPreview) + text : text;
 
-                // UI local: plaintext đã giải mã
                 msg.text = newText;
                 msg.isEdited = true;
                 renderMessages(chat);
                 renderChatList();
 
-                if (window.supabaseClient && msg.id && isUuid(String(msg.id))) {
+                if (window.supabaseClient) {
                     try {
-                        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
-                        let contentToStore = newText;
-                        // Mã hóa lại trước khi ghi DB (giống lúc gửi)
-                        if (window.ZChatE2EE && chat.participant.name !== "Saved Messages") {
-                            try {
-                                await window.ZChatE2EE.ensureUserKeys(me);
-                                const partner = await window.ZChatE2EE.fetchPublicKeyForUsername(chat.participant.name);
-                                const keysMap = {};
-                                const myPublic = window.ZChatE2EE.getLocalPublicKey();
-                                if (myPublic) keysMap[me.toLowerCase()] = myPublic;
-                                if (partner && partner.public_key) {
-                                    keysMap[String(partner.username || chat.participant.name).toLowerCase()] = partner.public_key;
-                                }
-                                if (Object.keys(keysMap).length) {
-                                    contentToStore = await window.ZChatE2EE.encryptMessageForUsers(newText, keysMap);
-                                }
-                            } catch (e2eeErr) {
-                                console.error("[E2EE] re-encrypt edit failed:", e2eeErr);
-                            }
-                        }
-                        const { error } = await window.supabaseClient
+                        await window.supabaseClient
                             .from("messages")
-                            .update({ content: contentToStore })
-                            .eq("id", msg.id);
-                        if (error) {
-                            console.error("[ZChat] Update message error:", error);
-                        }
+                            .update({ content: newText })
+                            .eq("id", editingMsgId);
                     } catch (err) {
                         console.error("[ZChat] Update Supabase error:", err);
                     }
-                } else {
-                    console.warn("[ZChat] Edit skip DB — message id chưa sync (chưa phải UUID server)");
                 }
             }
             cancelEditMode();
@@ -3256,7 +3227,7 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
@@ -3268,7 +3239,8 @@ function getVerifiedBadge(isVerified) {
 
                         let mine = isChatIdMine(chatId, meLower);
                         if (!mine && isUuid(chatId)) {
-                            mine = state.chats.some((c) => c.id === chatId);
+                            mine = state.chats.some((c) => c.id === chatId) ||
+                                !!(conversationOtherName[chatId]);
                         }
                         if (!mine) return;
 
@@ -3278,26 +3250,28 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        const rawContent = updatedMsg.content || "";
-                        if (rawContent && rawContent !== msg.text) {
-                            msg.text = rawContent;
-                            msg.isEdited = true;
-                            if (window.ZChatE2EE) {
-                                const priv = window.ZChatE2EE.getLocalPrivateKey();
-                                if (priv) {
-                                    window.ZChatE2EE.safeDecryptContent(rawContent, priv).then((plain) => {
-                                        if (plain != null) {
-                                            msg.text = plain;
-                                            if (state.activeChatId === chat.id) renderMessages(chat);
-                                            renderChatList();
-                                        }
-                                    }).catch(() => {});
-                                }
-                            }
-                        }
-
+                        // Seen / read_at — không gắn cờ edited
                         if (updatedMsg.read_at && msg.status !== "read") {
                             msg.status = "read";
+                        }
+
+                        // Chỉ coi là sửa khi plaintext thực sự đổi (content DB thường là E2EE)
+                        const rawContent = updatedMsg.content || "";
+                        if (rawContent) {
+                            let plain = rawContent;
+                            if (window.ZChatE2EE) {
+                                try {
+                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                    if (priv) {
+                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
+                                        if (d != null) plain = d;
+                                    }
+                                } catch (_) {}
+                            }
+                            if (plain !== msg.text) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                            }
                         }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
