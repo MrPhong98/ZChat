@@ -84,10 +84,72 @@
         document.querySelectorAll(".zc-incoming-avatar").forEach((n) => {
             n.textContent = ini;
         });
-        const remoteAv = $("zcRemoteAvatarCircle");
-        if (remoteAv) remoteAv.textContent = ini;
-        const localAv = $("zcLocalAvatarCircle");
-        if (localAv) localAv.textContent = peerInitials(myUsername || "?");
+        // Prefetch profile avatars for cam-off UI
+        if (name) fetchAndCacheAvatar(name, "peer");
+        if (myUsername) fetchAndCacheAvatar(myUsername, "self");
+    }
+
+    /* Profile avatar cache for cam-off overlays */
+    const avatarCache = Object.create(null); // usernameLower -> { type, url, emoji, color, initials }
+
+    async function fetchAndCacheAvatar(username, role) {
+        const key = (username || "").trim().toLowerCase();
+        if (!key) return null;
+        if (avatarCache[key]) {
+            if (role === "peer") paintAvatarEl($("zcRemoteAvatarCircle"), avatarCache[key]);
+            if (role === "self") paintAvatarEl($("zcLocalAvatarCircle"), avatarCache[key]);
+            return avatarCache[key];
+        }
+        const info = {
+            type: "initials",
+            url: null,
+            emoji: null,
+            color: "#333",
+            initials: peerInitials(username),
+        };
+        try {
+            if (window.supabaseClient) {
+                const { data } = await window.supabaseClient
+                    .from("users")
+                    .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
+                    .ilike("username", username)
+                    .maybeSingle();
+                if (data) {
+                    info.type = data.avatar_type || "initials";
+                    info.url = data.avatar_url || null;
+                    info.emoji = data.avatar_emoji || null;
+                    info.color = data.avatar_color || "#333";
+                    info.initials = peerInitials(data.username || username);
+                }
+            }
+        } catch (e) {
+            console.warn("[ZChatCall] fetch avatar:", e);
+        }
+        avatarCache[key] = info;
+        if (role === "peer") paintAvatarEl($("zcRemoteAvatarCircle"), info);
+        if (role === "self") paintAvatarEl($("zcLocalAvatarCircle"), info);
+        return info;
+    }
+
+    function paintAvatarEl(el, info) {
+        if (!el || !info) return;
+        el.innerHTML = "";
+        el.style.background = info.color || "#333";
+        el.style.color = "#fff";
+        if (info.type === "image" && info.url) {
+            const img = document.createElement("img");
+            img.src = info.url;
+            img.alt = "";
+            img.referrerPolicy = "no-referrer";
+            el.appendChild(img);
+        } else if (info.type === "emoji" && info.emoji) {
+            el.textContent = info.emoji;
+            el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "64px" : "28px";
+            el.style.background = info.color || "#1f1f1f";
+        } else {
+            el.textContent = info.initials || "?";
+            el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "48px" : "22px";
+        }
     }
 
     function setLocalCamAvatarVisible(on) {
@@ -101,8 +163,11 @@
             if (on) video.classList.add("zc-cam-off");
             else video.classList.remove("zc-cam-off");
         }
-        const localAv = $("zcLocalAvatarCircle");
-        if (localAv) localAv.textContent = peerInitials(myUsername || "?");
+        if (on) {
+            const key = (myUsername || "").toLowerCase();
+            if (avatarCache[key]) paintAvatarEl($("zcLocalAvatarCircle"), avatarCache[key]);
+            else fetchAndCacheAvatar(myUsername, "self");
+        }
     }
 
     function setRemoteCamAvatarVisible(on) {
@@ -113,8 +178,11 @@
             else overlay.classList.add("hidden");
         }
         if (video) video.style.opacity = on ? "0" : "1";
-        const remoteAv = $("zcRemoteAvatarCircle");
-        if (remoteAv) remoteAv.textContent = peerInitials(peerUsername || "?");
+        if (on) {
+            const key = (peerUsername || "").toLowerCase();
+            if (avatarCache[key]) paintAvatarEl($("zcRemoteAvatarCircle"), avatarCache[key]);
+            else fetchAndCacheAvatar(peerUsername, "peer");
+        }
     }
 
     /* ---------- Media / PeerConnection ---------- */
@@ -176,14 +244,11 @@
                 remoteVideo.play().catch(() => {});
             }
             if (ev.track && ev.track.kind === "video") {
-                const syncRemoteCam = () => {
-                    const videoOn = ev.track.enabled && ev.track.readyState === "live" && !ev.track.muted;
-                    setRemoteCamAvatarVisible(!videoOn);
-                };
                 ev.track.onmute = () => setRemoteCamAvatarVisible(true);
                 ev.track.onunmute = () => setRemoteCamAvatarVisible(false);
                 ev.track.onended = () => setRemoteCamAvatarVisible(true);
-                syncRemoteCam();
+                const videoOn = ev.track.enabled && ev.track.readyState === "live" && !ev.track.muted;
+                setRemoteCamAvatarVisible(!videoOn);
             }
         };
 
@@ -292,6 +357,8 @@
         peerUsername = target;
         isCaller = true;
         callActive = true;
+        fetchAndCacheAvatar(target, "peer");
+        fetchAndCacheAvatar(myUsername, "self");
         showOutgoingUI(target);
 
         try {
@@ -384,7 +451,6 @@
             t.enabled = camEnabled;
         });
         setLocalCamAvatarVisible(!camEnabled);
-        // Báo peer để hiện avatar (kèm track mute)
         if (socket && peerUsername) {
             socket.emit("media_state", {
                 to: peerUsername,
@@ -451,6 +517,8 @@
             pendingOffer = payload.offer;
             callActive = true;
             isCaller = false;
+            fetchAndCacheAvatar(payload.from, "peer");
+            fetchAndCacheAvatar(myUsername, "self");
             showIncomingUI(payload.from);
         });
 
