@@ -84,9 +84,37 @@
         document.querySelectorAll(".zc-incoming-avatar").forEach((n) => {
             n.textContent = ini;
         });
-        document.querySelectorAll(".zc-incall-status").forEach((n) => {
-            /* giữ nguyên, status set riêng */
-        });
+        const remoteAv = $("zcRemoteAvatarCircle");
+        if (remoteAv) remoteAv.textContent = ini;
+        const localAv = $("zcLocalAvatarCircle");
+        if (localAv) localAv.textContent = peerInitials(myUsername || "?");
+    }
+
+    function setLocalCamAvatarVisible(on) {
+        const overlay = $("zcLocalAvatarOverlay");
+        const video = $("zcLocalVideo");
+        if (overlay) {
+            if (on) overlay.classList.remove("hidden");
+            else overlay.classList.add("hidden");
+        }
+        if (video) {
+            if (on) video.classList.add("zc-cam-off");
+            else video.classList.remove("zc-cam-off");
+        }
+        const localAv = $("zcLocalAvatarCircle");
+        if (localAv) localAv.textContent = peerInitials(myUsername || "?");
+    }
+
+    function setRemoteCamAvatarVisible(on) {
+        const overlay = $("zcRemoteAvatarOverlay");
+        const video = $("zcRemoteVideo");
+        if (overlay) {
+            if (on) overlay.classList.remove("hidden");
+            else overlay.classList.add("hidden");
+        }
+        if (video) video.style.opacity = on ? "0" : "1";
+        const remoteAv = $("zcRemoteAvatarCircle");
+        if (remoteAv) remoteAv.textContent = peerInitials(peerUsername || "?");
     }
 
     /* ---------- Media / PeerConnection ---------- */
@@ -146,6 +174,16 @@
                 remoteVideo.srcObject = remoteStream;
                 remoteVideo.playsInline = true;
                 remoteVideo.play().catch(() => {});
+            }
+            if (ev.track && ev.track.kind === "video") {
+                const syncRemoteCam = () => {
+                    const videoOn = ev.track.enabled && ev.track.readyState === "live" && !ev.track.muted;
+                    setRemoteCamAvatarVisible(!videoOn);
+                };
+                ev.track.onmute = () => setRemoteCamAvatarVisible(true);
+                ev.track.onunmute = () => setRemoteCamAvatarVisible(false);
+                ev.track.onended = () => setRemoteCamAvatarVisible(true);
+                syncRemoteCam();
             }
         };
 
@@ -223,6 +261,8 @@
         stopMedia();
         micEnabled = true;
         camEnabled = true;
+        setLocalCamAvatarVisible(false);
+        setRemoteCamAvatarVisible(false);
         updateMicCamButtons();
         hideAllCallUI();
 
@@ -343,6 +383,16 @@
         localStream.getVideoTracks().forEach((t) => {
             t.enabled = camEnabled;
         });
+        setLocalCamAvatarVisible(!camEnabled);
+        // Báo peer để hiện avatar (kèm track mute)
+        if (socket && peerUsername) {
+            socket.emit("media_state", {
+                to: peerUsername,
+                from: myUsername,
+                video: camEnabled,
+                audio: micEnabled,
+            });
+        }
         updateMicCamButtons();
     }
 
@@ -429,6 +479,12 @@
 
         socket.on("call_ended", () => {
             cleanupCall(false);
+        });
+
+        socket.on("media_state", (payload) => {
+            if (!payload) return;
+            if (payload.video === false) setRemoteCamAvatarVisible(true);
+            else if (payload.video === true) setRemoteCamAvatarVisible(false);
         });
 
         socket.on("call_error", (payload) => {
