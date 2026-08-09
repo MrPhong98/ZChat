@@ -333,7 +333,6 @@ select.custom-select {
 }
 
 
-/* Call avatars (cam off) */
 #zcLocalVideo.zc-cam-off { opacity: 0; }
 .zc-call-avatar-circle img {
     width: 100%;
