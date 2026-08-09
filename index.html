@@ -699,25 +699,21 @@
 
         <!-- IN-CALL -->
         <div id="zcInCallPanel" class="hidden fixed inset-0 z-[81] flex flex-col" style="background-color: #000;">
-            <video id="zcRemoteVideo" class="absolute inset-0 h-full w-full object-cover" autoplay playsinline></video>
-            <!-- Avatar khi remote tắt cam: tròn giữa màn hình -->
+            <video id="zcRemoteVideo" class="absolute inset-0 h-full w-full object-cover transition-opacity" autoplay playsinline></video>
+            <!-- Avatar profile khi remote tắt cam -->
             <div id="zcRemoteAvatarOverlay" class="hidden absolute inset-0 z-[2] flex items-center justify-center pointer-events-none"
                  style="background:#0a0a0a;">
-                <div id="zcRemoteAvatarCircle"
-                     class="flex items-center justify-center rounded-full text-4xl sm:text-5xl font-bold select-none text-white shadow-2xl"
-                     style="width:140px;height:140px;background:linear-gradient(145deg,#2a2a2a,#1a1a1a);border:2px solid rgba(255,255,255,0.12);">?</div>
+                <div id="zcRemoteAvatarCircle" class="zc-call-avatar-circle flex items-center justify-center rounded-full overflow-hidden select-none shadow-2xl"
+                     style="width:148px;height:148px;background:#1f1f1f;border:2px solid rgba(255,255,255,0.12);font-size:48px;font-weight:700;color:#fff;">?</div>
             </div>
 
             <div id="zcLocalVideoWrap"
                  class="absolute bottom-28 right-4 h-36 w-28 sm:h-44 sm:w-32 rounded-2xl overflow-hidden shadow-2xl border"
                  style="border-color: rgba(255,255,255,0.2); background:#111; z-index:5;">
                 <video id="zcLocalVideo" class="h-full w-full object-cover" autoplay playsinline muted></video>
-                <!-- Avatar local khi tắt cam -->
-                <div id="zcLocalAvatarOverlay" class="hidden absolute inset-0 z-[1] flex items-center justify-center"
-                     style="background:#1a1a1a;">
-                    <div id="zcLocalAvatarCircle"
-                         class="flex items-center justify-center rounded-full text-lg font-bold select-none text-white"
-                         style="width:56px;height:56px;background:#333;">?</div>
+                <div id="zcLocalAvatarOverlay" class="hidden absolute inset-0 z-[1] flex items-center justify-center" style="background:#1a1a1a;">
+                    <div id="zcLocalAvatarCircle" class="zc-call-avatar-circle flex items-center justify-center rounded-full overflow-hidden select-none"
+                         style="width:64px;height:64px;background:#333;font-size:22px;font-weight:700;color:#fff;">?</div>
                 </div>
             </div>
 
