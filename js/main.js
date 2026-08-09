@@ -2724,26 +2724,82 @@ function getVerifiedBadge(isVerified) {
             }
             const convIds = convRows.map((c) => c.id).filter(Boolean);
 
+            // Resolve username đối phương từ user_1 / user_2 (tránh hiện "Chat User")
+            const otherIds = [];
+            const convOtherId = Object.create(null); // convId → otherUserId
+            for (const c of convRows) {
+                if (!c || !c.id || !myId) continue;
+                const otherId = String(c.user_1) === String(myId) ? c.user_2 : c.user_1;
+                if (otherId) {
+                    convOtherId[c.id] = otherId;
+                    otherIds.push(otherId);
+                }
+            }
+            const uniqueOtherIds = [...new Set(otherIds.filter(Boolean))];
+            if (uniqueOtherIds.length && window.supabaseClient) {
+                try {
+                    const { data: userRows } = await window.supabaseClient
+                        .from("users")
+                        .select("id, username, avatar_type, avatar_color, avatar_emoji, avatar_url, is_verified")
+                        .in("id", uniqueOtherIds);
+                    const byId = Object.create(null);
+                    (userRows || []).forEach((u) => {
+                        if (u && u.id) byId[u.id] = u;
+                    });
+                    for (const c of convRows) {
+                        if (!c || !c.id) continue;
+                        const oid = convOtherId[c.id];
+                        const u = oid ? byId[oid] : null;
+                        if (u && u.username) {
+                            conversationOtherName[c.id] = u.username;
+                        }
+                    }
+                    // Gắn luôn vào state nếu chat đã tồn tại
+                    state.chats.forEach((chat) => {
+                        if (!isUuid(chat.id)) return;
+                        const uname = conversationOtherName[chat.id];
+                        if (uname && (chat.participant.name === "Chat User" || !chat.participant.name)) {
+                            chat.participant.name = uname;
+                            const oid = convOtherId[chat.id];
+                            const u = oid ? byId[oid] : null;
+                            if (u) applyAvatarFields(chat.participant, u);
+                            if (oid) chat.participant.userId = oid;
+                        }
+                    });
+                } catch (e) {
+                    console.warn("[ZChat] resolve partner names:", e);
+                }
+            }
+
             // Đảm bảo có slot chat trong state (kể cả chưa có tin)
             for (const c of convRows) {
                 if (!c || !c.id) continue;
-                if (state.chats.some((x) => x.id === c.id)) continue;
-                const otherId = c.user_1 === myId ? c.user_2 : c.user_1;
-                state.chats.push({
-                    id: c.id,
-                    participant: {
-                        id: otherId || uid("u"),
-                        name: conversationOtherName[c.id] || "Chat User",
-                        userId: otherId || null,
-                        online: true,
-                        lastSeen: null,
-                    },
-                    unread: 0,
-                    disappearingTime: "off",
-                    blockScreenshots: false,
-                    messages: [],
-                    _msgsFullyLoaded: false,
-                });
+                const otherId = convOtherId[c.id] || (c.user_1 === myId ? c.user_2 : c.user_1);
+                const partnerName = conversationOtherName[c.id] || null;
+                let chat = state.chats.find((x) => x.id === c.id);
+                if (!chat) {
+                    chat = {
+                        id: c.id,
+                        participant: {
+                            id: otherId || uid("u"),
+                            name: partnerName || "Chat User",
+                            userId: otherId || null,
+                            online: true,
+                            lastSeen: null,
+                        },
+                        unread: 0,
+                        disappearingTime: "off",
+                        blockScreenshots: false,
+                        messages: [],
+                        _msgsFullyLoaded: false,
+                    };
+                    state.chats.push(chat);
+                } else {
+                    if (partnerName && (chat.participant.name === "Chat User" || !chat.participant.name)) {
+                        chat.participant.name = partnerName;
+                    }
+                    if (otherId) chat.participant.userId = otherId;
+                }
             }
 
             // 2) Tập chat_id cần preview: conversations + saved + (legacy nếu còn)
@@ -2832,6 +2888,15 @@ function getVerifiedBadge(isVerified) {
                         status: m.read_at ? "read" : "delivered",
                     });
                 }
+                // Cập nhật tên nếu đang placeholder
+                if (
+                    (chat.participant.name === "Chat User" || !chat.participant.name) &&
+                    m.sender_username &&
+                    m.sender_username.toLowerCase() !== meLower
+                ) {
+                    chat.participant.name = m.sender_username;
+                    conversationOtherName[chatId] = m.sender_username;
+                }
             }
 
             await Promise.all(
@@ -2844,6 +2909,24 @@ function getVerifiedBadge(isVerified) {
                     }
                 })
             );
+
+            // Bổ sung: nếu còn "Chat User" mà có tin từ người khác → lấy sender_username
+            state.chats.forEach((chat) => {
+                if (chat.participant.name !== "Chat User" && chat.participant.name) return;
+                if (String(chat.id).startsWith("saved_")) {
+                    chat.participant.name = "Saved Messages";
+                    return;
+                }
+                const fromMsg = chat.messages.find(
+                    (m) => m.senderId && m.senderId !== "me" && m.senderId !== me
+                );
+                if (fromMsg && fromMsg.senderId) {
+                    chat.participant.name = fromMsg.senderId;
+                    conversationOtherName[chat.id] = fromMsg.senderId;
+                } else if (conversationOtherName[chat.id]) {
+                    chat.participant.name = conversationOtherName[chat.id];
+                }
+            });
 
             state.chats.forEach((c) => {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
