@@ -2,12 +2,12 @@
  * Z-Chat WebRTC 1-1 Video Call client
  * ------------------------------------
  * Phụ thuộc: socket.io client (CDN), lucide (optional icons)
- * Cấu hình: window.ZCHAT_SIGNAL_URL (mặc định http://localhost:5000)
+ * Cấu hình: window.ZCHAT_SIGNAL_URL
  *
- * API public:
+ * API:
  *   ZChatCall.init()
  *   ZChatCall.startCall(targetUsername)
- *   ZChatCall.register(username)  // gọi sau login
+ *   ZChatCall.register(username)
  */
 (function () {
     "use strict";
@@ -16,6 +16,12 @@
         window.ZCHAT_SIGNAL_URL ||
         localStorage.getItem("zchat_signal_url") ||
         "https://zchat-backend-call.onrender.com";
+
+    // Nhạc chờ khi gọi đi — đặt file tại assets/audio/blue-boi.mp3
+    const RINGBACK_URL =
+        window.ZCHAT_RINGBACK_URL ||
+        localStorage.getItem("zchat_ringback_url") ||
+        "assets/audio/blue-boi.mp3";
 
     const ICE_SERVERS = {
         iceServers: [
@@ -35,8 +41,10 @@
     let pendingOffer = null;
     let micEnabled = true;
     let camEnabled = true;
+    let ringbackAudio = null;
 
-    /* ---------- DOM helpers ---------- */
+    const avatarCache = Object.create(null);
+
     function $(id) {
         return document.getElementById(id);
     }
@@ -71,35 +79,72 @@
             .join("") || "?";
     }
 
-    function setPeerName(name) {
-        const label = name || "Unknown";
-        const ini = peerInitials(name);
-        const el = $("zcCallPeerName");
-        if (el) el.textContent = label;
-        const av = $("zcCallPeerAvatar");
-        if (av) av.textContent = ini;
-        document.querySelectorAll(".zc-incoming-name, .zc-incall-name").forEach((n) => {
-            n.textContent = label;
-        });
-        document.querySelectorAll(".zc-incoming-avatar").forEach((n) => {
-            n.textContent = ini;
-        });
-        // Prefetch profile avatars for cam-off UI
-        if (name) fetchAndCacheAvatar(name, "peer");
-        if (myUsername) fetchAndCacheAvatar(myUsername, "self");
-    }
+    function paintAvatarEl(el, info) {
+        if (!el || !info) return;
+        el.innerHTML = "";
+        el.style.background = info.color || "#333";
+        el.style.color = "#fff";
+        el.style.backgroundImage = "";
 
-    /* Profile avatar cache for cam-off overlays */
-    const avatarCache = Object.create(null); // usernameLower -> { type, url, emoji, color, initials }
+        // App dùng avatar_type = "photo" (không phải "image")
+        const isPhoto =
+            (info.type === "photo" || info.type === "image" || info.type === "url") &&
+            !!info.url;
+
+        if (isPhoto) {
+            const img = document.createElement("img");
+            img.src = info.url;
+            img.alt = "";
+            img.referrerPolicy = "no-referrer";
+            img.draggable = false;
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+            img.onerror = function () {
+                el.innerHTML = "";
+                el.textContent = info.initials || "?";
+            };
+            el.appendChild(img);
+            return;
+        }
+
+        if (info.type === "emoji" && info.emoji) {
+            el.textContent = info.emoji;
+            el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "64px" : "28px";
+            return;
+        }
+
+        el.textContent = info.initials || "?";
+        el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "48px" : "22px";
+    }
 
     async function fetchAndCacheAvatar(username, role) {
         const key = (username || "").trim().toLowerCase();
         if (!key) return null;
+
         if (avatarCache[key]) {
             if (role === "peer") paintAvatarEl($("zcRemoteAvatarCircle"), avatarCache[key]);
             if (role === "self") paintAvatarEl($("zcLocalAvatarCircle"), avatarCache[key]);
             return avatarCache[key];
         }
+
+        const meKey = (myUsername || localStorage.getItem("zchat_username") || "").toLowerCase();
+        if (key === meKey) {
+            const lsType = localStorage.getItem("zchat_avatar_type") || "initials";
+            const lsUrl = localStorage.getItem("zchat_avatar_url") || "";
+            const lsEmoji = localStorage.getItem("zchat_avatar_emoji") || "";
+            const lsColor = localStorage.getItem("zchat_avatar_color") || "#333";
+            if (lsUrl || lsType === "emoji" || lsType === "photo") {
+                const localInfo = {
+                    type: lsType,
+                    url: lsUrl || null,
+                    emoji: lsEmoji || null,
+                    color: lsColor,
+                    initials: peerInitials(myUsername),
+                };
+                avatarCache[key] = localInfo;
+                if (role === "self") paintAvatarEl($("zcLocalAvatarCircle"), localInfo);
+            }
+        }
+
         const info = {
             type: "initials",
             url: null,
@@ -107,49 +152,33 @@
             color: "#333",
             initials: peerInitials(username),
         };
+
         try {
             if (window.supabaseClient) {
-                const { data } = await window.supabaseClient
+                const { data, error } = await window.supabaseClient
                     .from("users")
                     .select("username, avatar_type, avatar_color, avatar_emoji, avatar_url")
                     .ilike("username", username)
                     .maybeSingle();
-                if (data) {
-                    info.type = data.avatar_type || "initials";
+                if (!error && data) {
+                    info.type = data.avatar_type || (data.avatar_url ? "photo" : "initials");
                     info.url = data.avatar_url || null;
                     info.emoji = data.avatar_emoji || null;
                     info.color = data.avatar_color || "#333";
                     info.initials = peerInitials(data.username || username);
+                    if (info.url && (!data.avatar_type || data.avatar_type === "initials")) {
+                        info.type = "photo";
+                    }
                 }
             }
         } catch (e) {
             console.warn("[ZChatCall] fetch avatar:", e);
         }
+
         avatarCache[key] = info;
         if (role === "peer") paintAvatarEl($("zcRemoteAvatarCircle"), info);
         if (role === "self") paintAvatarEl($("zcLocalAvatarCircle"), info);
         return info;
-    }
-
-    function paintAvatarEl(el, info) {
-        if (!el || !info) return;
-        el.innerHTML = "";
-        el.style.background = info.color || "#333";
-        el.style.color = "#fff";
-        if (info.type === "image" && info.url) {
-            const img = document.createElement("img");
-            img.src = info.url;
-            img.alt = "";
-            img.referrerPolicy = "no-referrer";
-            el.appendChild(img);
-        } else if (info.type === "emoji" && info.emoji) {
-            el.textContent = info.emoji;
-            el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "64px" : "28px";
-            el.style.background = info.color || "#1f1f1f";
-        } else {
-            el.textContent = info.initials || "?";
-            el.style.fontSize = el.id === "zcRemoteAvatarCircle" ? "48px" : "22px";
-        }
     }
 
     function setLocalCamAvatarVisible(on) {
@@ -185,7 +214,48 @@
         }
     }
 
-    /* ---------- Media / PeerConnection ---------- */
+    function setPeerName(name) {
+        const label = name || "Unknown";
+        const ini = peerInitials(name);
+        const el = $("zcCallPeerName");
+        if (el) el.textContent = label;
+        const av = $("zcCallPeerAvatar");
+        if (av) av.textContent = ini;
+        document.querySelectorAll(".zc-incoming-name, .zc-incall-name").forEach((n) => {
+            n.textContent = label;
+        });
+        document.querySelectorAll(".zc-incoming-avatar").forEach((n) => {
+            n.textContent = ini;
+        });
+        if (name) fetchAndCacheAvatar(name, "peer");
+        if (myUsername) fetchAndCacheAvatar(myUsername, "self");
+    }
+
+    function startRingback() {
+        stopRingback();
+        try {
+            ringbackAudio = new Audio(RINGBACK_URL);
+            ringbackAudio.loop = true;
+            ringbackAudio.volume = 0.7;
+            const p = ringbackAudio.play();
+            if (p && typeof p.catch === "function") {
+                p.catch((err) => console.warn("[ZChatCall] ringback play blocked:", err));
+            }
+        } catch (e) {
+            console.warn("[ZChatCall] ringback:", e);
+        }
+    }
+
+    function stopRingback() {
+        if (ringbackAudio) {
+            try {
+                ringbackAudio.pause();
+                ringbackAudio.currentTime = 0;
+            } catch (_) {}
+            ringbackAudio = null;
+        }
+    }
+
     async function getMedia(video) {
         if (localStream) return localStream;
         localStream = await navigator.mediaDevices.getUserMedia({
@@ -218,9 +288,7 @@
 
     function createPeerConnection() {
         if (pc) {
-            try {
-                pc.close();
-            } catch (_) {}
+            try { pc.close(); } catch (_) {}
         }
         pc = new RTCPeerConnection(ICE_SERVERS);
 
@@ -247,7 +315,10 @@
                 ev.track.onmute = () => setRemoteCamAvatarVisible(true);
                 ev.track.onunmute = () => setRemoteCamAvatarVisible(false);
                 ev.track.onended = () => setRemoteCamAvatarVisible(true);
-                const videoOn = ev.track.enabled && ev.track.readyState === "live" && !ev.track.muted;
+                const videoOn =
+                    ev.track.enabled &&
+                    ev.track.readyState === "live" &&
+                    !ev.track.muted;
                 setRemoteCamAvatarVisible(!videoOn);
             }
         };
@@ -255,6 +326,7 @@
         pc.onconnectionstatechange = () => {
             const st = pc && pc.connectionState;
             if (st === "connected") {
+                stopRingback();
                 setStatus("Connected");
                 showInCallUI();
             } else if (st === "failed" || st === "disconnected" || st === "closed") {
@@ -272,7 +344,6 @@
         });
     }
 
-    /* ---------- UI states ---------- */
     function showOutgoingUI(name) {
         hide($("zcIncomingPanel"));
         hide($("zcInCallPanel"));
@@ -280,6 +351,7 @@
         show($("zcCallModal"));
         setPeerName(name);
         setStatus("Calling...");
+        startRingback();
         icons();
     }
 
@@ -294,6 +366,7 @@
     }
 
     function showInCallUI() {
+        stopRingback();
         hide($("zcOutgoingPanel"));
         hide($("zcIncomingPanel"));
         show($("zcInCallPanel"));
@@ -303,6 +376,7 @@
     }
 
     function hideAllCallUI() {
+        stopRingback();
         hide($("zcCallModal"));
         hide($("zcOutgoingPanel"));
         hide($("zcIncomingPanel"));
@@ -310,17 +384,15 @@
         setStatus("");
     }
 
-    /* ---------- Call lifecycle ---------- */
     function cleanupCall(notifyPeer) {
         const peer = peerUsername;
         callActive = false;
         pendingOffer = null;
         isCaller = false;
+        stopRingback();
 
         if (pc) {
-            try {
-                pc.close();
-            } catch (_) {}
+            try { pc.close(); } catch (_) {}
             pc = null;
         }
         stopMedia();
@@ -387,6 +459,7 @@
         if (!pendingOffer || !peerUsername) return;
         callActive = true;
         isCaller = false;
+        stopRingback();
         showInCallUI();
 
         try {
@@ -478,7 +551,6 @@
         icons();
     }
 
-    /* ---------- Socket ---------- */
     function connectSocket() {
         if (typeof io === "undefined") {
             console.error("[ZChatCall] socket.io client chưa load (cdn).");
@@ -494,9 +566,7 @@
 
         socket.on("connect", () => {
             console.log("[ZChatCall] socket connected", SIGNAL_URL);
-            if (myUsername) {
-                socket.emit("register", { username: myUsername });
-            }
+            if (myUsername) socket.emit("register", { username: myUsername });
         });
 
         socket.on("registered", (payload) => {
@@ -505,7 +575,6 @@
 
         socket.on("incoming_call", async (payload) => {
             if (callActive) {
-                // Đang bận → từ chối
                 socket.emit("end_call", {
                     to: payload.from,
                     from: myUsername,
@@ -525,9 +594,8 @@
         socket.on("call_answered", async (payload) => {
             if (!pc || !isCaller) return;
             try {
-                await pc.setRemoteDescription(
-                    new RTCSessionDescription(payload.answer)
-                );
+                stopRingback();
+                await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
                 setStatus("Connected");
                 showInCallUI();
             } catch (err) {
@@ -577,6 +645,7 @@
         if (socket && socket.connected) {
             socket.emit("register", { username: myUsername });
         }
+        fetchAndCacheAvatar(myUsername, "self");
     }
 
     function bindUI() {
@@ -594,12 +663,10 @@
         if (mute) mute.onclick = () => toggleMic();
         if (cam) cam.onclick = () => toggleCam();
 
-        // Nút video trên header chat
         const videoBtn = document.querySelector('button[aria-label="Video call"]');
         if (videoBtn && !videoBtn.dataset.zchatCallBound) {
             videoBtn.dataset.zchatCallBound = "1";
             videoBtn.addEventListener("click", () => {
-                // Lấy tên đối phương từ header
                 const nameEl = document.getElementById("chatHeaderName");
                 const peer = nameEl ? nameEl.textContent.trim() : "";
                 if (!peer || peer === "Saved Messages") {
@@ -616,7 +683,6 @@
         bindUI();
         if (myUsername) register(myUsername);
 
-        // Đồng bộ khi main.js gọi enterApp
         const prev = window.zchatEnterApp;
         window.zchatEnterApp = function (username) {
             if (typeof prev === "function") prev(username);
@@ -624,7 +690,6 @@
         };
     }
 
-    // Public API
     window.ZChatCall = {
         init,
         register,
