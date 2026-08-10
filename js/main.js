@@ -3381,17 +3381,21 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
+                        const chatId = updatedMsg.chat_id;
+                        if (!chatId || !meLower) return;
 
                         // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
-                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+                        if (!isChatIdMine(chatId, meLower) &&
+                            !(isUuid(chatId) && state.chats.some((c) => c.id === chatId))) {
+                            return;
+                        }
 
                         const chat = state.chats.find((c) => c.id === chatId);
                         if (!chat) return;
@@ -3399,14 +3403,30 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        const contentChanged = (updatedMsg.content || "") !== msg.text;
-                        if (contentChanged) {
-                            msg.text = updatedMsg.content || "";
-                            msg.isEdited = true;
-                        }
-
+                        // Seen / read_at — chỉ đổi status, KHÔNG đụng content
                         if (updatedMsg.read_at && msg.status !== "read") {
                             msg.status = "read";
+                        }
+
+                        // Content trên DB luôn là ciphertext E2EE.
+                        // Bẫy cũ: so sánh ciphertext !== plaintext → ghi đè text bằng chuỗi mã hóa.
+                        // Chỉ cập nhật text sau khi decrypt và plaintext thật sự khác.
+                        const rawContent = updatedMsg.content || "";
+                        if (rawContent) {
+                            let plain = rawContent;
+                            if (window.ZChatE2EE) {
+                                try {
+                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                    if (priv) {
+                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
+                                        if (d != null) plain = d;
+                                    }
+                                } catch (_) {}
+                            }
+                            if (plain !== msg.text) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                            }
                         }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
