@@ -323,7 +323,7 @@ select.custom-select {
 .verified-badge {
     width: 14px !important;
     height: 14px !important;
-    flex-shrink: 0;
+    flex-shrink: 2;
     display: block !important;
     color: #3b82f6;
     position: relative;
