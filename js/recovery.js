@@ -1,15 +1,18 @@
 /**
- * ZChat Passcode Lock (beta) — elonmusk only
- * public.passcode: user_id + passcode (no username column)
+ * ZChat Passcode Lock
+ * - Chưa có passcode trên server → Create + Confirm → lưu public.passcode
+ * - Đã có → Enter passcode
+ * - Unlock hợp lệ 50 giờ (localStorage zchat_passcode_unlocked_at)
+ * - Sai 20 lần → khoá 30 giây
  */
 (function () {
     "use strict";
 
-    const BETA_USERNAME = "elonmusk";
     const MAX_ATTEMPTS = 20;
     const LOCK_SECONDS = 30;
+    const TTL_MS = 50 * 60 * 60 * 1000; // 50 hours
     const APP_URL = "index.html";
-    const LS_SESSION = "zchat_passcode_ok";
+    const LS_UNLOCKED_AT = "zchat_passcode_unlocked_at";
     const LS_FAILS = "zchat_passcode_fails";
     const LS_LOCK_UNTIL = "zchat_passcode_lock_until";
 
@@ -34,9 +37,6 @@
 
     function username() { return (localStorage.getItem("zchat_username") || "").trim(); }
     function userId() { return localStorage.getItem("zchat_user_id") || null; }
-    function canUsePasscodeBeta(name) {
-        return String(name || "").trim().toLowerCase() === BETA_USERNAME;
-    }
 
     function applyThemeFromSettings() {
         try {
@@ -54,14 +54,14 @@
         renderDots();
         hideError();
         if (m === "create") {
-            titleEl.textContent = "Create a passcode";
-            subEl.textContent = "Choose a 4-digit passcode";
+            if (titleEl) titleEl.textContent = "Create a passcode";
+            if (subEl) subEl.textContent = "Choose a 4-digit passcode";
         } else if (m === "confirm") {
-            titleEl.textContent = "Confirm passcode";
-            subEl.textContent = "Re-enter your 4-digit passcode";
+            if (titleEl) titleEl.textContent = "Confirm passcode";
+            if (subEl) subEl.textContent = "Re-enter your 4-digit passcode";
         } else {
-            titleEl.textContent = "Enter a passcode";
-            subEl.textContent = "Enter your 4-digit passcode";
+            if (titleEl) titleEl.textContent = "Enter a passcode";
+            if (subEl) subEl.textContent = "Enter your 4-digit passcode";
         }
         focusInput();
     }
@@ -201,9 +201,10 @@
     }
 
     function unlockAndGo() {
-        sessionStorage.setItem(LS_SESSION, "1");
+        localStorage.setItem(LS_UNLOCKED_AT, String(Date.now()));
         setFailCount(0);
         sessionStorage.removeItem(LS_LOCK_UNTIL);
+        sessionStorage.removeItem("zchat_passcode_ok"); // legacy
         window.location.replace(APP_URL);
     }
 
@@ -310,14 +311,19 @@
 
     async function init() {
         applyThemeFromSettings();
+        if (betaBlocked) betaBlocked.classList.add("hidden");
+        if (screen) screen.classList.remove("hidden");
+
         const name = username();
         if (!name) {
             window.location.replace(APP_URL);
             return;
         }
-        if (!canUsePasscodeBeta(name)) {
-            if (screen) screen.classList.add("hidden");
-            if (betaBlocked) betaBlocked.classList.remove("hidden");
+
+        // Đã unlock trong 50h → vào app
+        const unlockedAt = parseInt(localStorage.getItem(LS_UNLOCKED_AT) || "0", 10) || 0;
+        if (unlockedAt > 0 && (Date.now() - unlockedAt) < TTL_MS) {
+            window.location.replace(APP_URL);
             return;
         }
 
@@ -327,13 +333,14 @@
             setMode("enter");
             return;
         }
+
         const row = await fetchPasscodeRow();
         if (row && row.passcode) setMode("enter");
         else setMode("create");
         focusInput();
     }
 
-    window.ZChatPasscode = { canUsePasscodeBeta, init };
+    window.ZChatPasscode = { init, TTL_MS };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
