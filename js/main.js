@@ -897,13 +897,13 @@ function getVerifiedBadge(isVerified) {
     }
 
     function enterApp(username) {
-        // Passcode beta (elonmusk): mỗi lần vào web / reload phải nhập passcode
-        // recovery set zchat_passcode_ok=1 (one-shot) → vào app rồi xoá ngay
+        // Passcode lock: chưa có / hết 50 giờ kể từ lần unlock → recovery.html
         const uname = String(username || "").trim();
-        if (uname.toLowerCase() === "elonmusk") {
-            if (sessionStorage.getItem("zchat_passcode_ok") === "1") {
-                sessionStorage.removeItem("zchat_passcode_ok");
-            } else {
+        if (uname) {
+            const TTL_MS = 50 * 60 * 60 * 1000; // 50 hours
+            const unlockedAt = parseInt(localStorage.getItem("zchat_passcode_unlocked_at") || "0", 10) || 0;
+            const stillValid = unlockedAt > 0 && (Date.now() - unlockedAt) < TTL_MS;
+            if (!stillValid) {
                 window.location.replace("recovery.html");
                 return;
             }
