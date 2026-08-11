@@ -26,7 +26,18 @@
             noRecovery: "No recovery password saved",
             save: "Save Changes",
             savedAlert: "Settings updated successfully!",
-            logout: "Log out"
+            logout: "Log out",
+            changePasscode: "Change Passcode",
+            changePasscodeDesc: "Update your 4-digit app lock passcode. Saved to your account on the server.",
+            currentPasscode: "Current",
+            newPasscode: "New",
+            confirmPasscode: "Confirm",
+            updatePasscode: "Update Passcode",
+            passcodeUpdated: "Passcode updated!",
+            passcodeMismatch: "New passcodes do not match",
+            passcodeWrong: "Current passcode is incorrect",
+            passcodeInvalid: "Passcode must be 4 digits",
+            passcodeNoUser: "Account not found"
         },
         vi: {
             title: "Cài đặt",
@@ -51,7 +62,18 @@
             noRecovery: "Chưa có mật khẩu khôi phục",
             save: "Lưu thay đổi",
             savedAlert: "Cập nhật cài đặt thành công!",
-            logout: "Đăng xuất"
+            logout: "Đăng xuất",
+            changePasscode: "Đổi mã passcode",
+            changePasscodeDesc: "Cập nhật mã khóa app 4 số. Lưu trên tài khoản (server).",
+            currentPasscode: "Hiện tại",
+            newPasscode: "Mới",
+            confirmPasscode: "Xác nhận",
+            updatePasscode: "Cập nhật passcode",
+            passcodeUpdated: "Đã cập nhật passcode!",
+            passcodeMismatch: "Passcode mới không khớp",
+            passcodeWrong: "Passcode hiện tại không đúng",
+            passcodeInvalid: "Passcode phải gồm 4 chữ số",
+            passcodeNoUser: "Không tìm thấy tài khoản"
         },
         zh: {
             title: "设置",
@@ -76,7 +98,18 @@
             noRecovery: "未保存恢复密码",
             save: "保存更改",
             savedAlert: "设置更新成功！",
-            logout: "退出登录"
+            logout: "退出登录",
+            changePasscode: "更改密码",
+            changePasscodeDesc: "更新您的 4 位应用锁密码。将保存到服务器上的账户。",
+            currentPasscode: "当前",
+            newPasscode: "新密码",
+            confirmPasscode: "确认",
+            updatePasscode: "更新密码",
+            passcodeUpdated: "密码已更新！",
+            passcodeMismatch: "新密码不匹配",
+            passcodeWrong: "当前密码不正确",
+            passcodeInvalid: "密码必须为 4 位数字",
+            passcodeNoUser: "未找到账户"
         },
         ru: {
             title: "Настройки",
@@ -101,7 +134,18 @@
             noRecovery: "Пароль восстановления не сохранён",
             save: "Сохранить изменения",
             savedAlert: "Настройки успешно обновлены!",
-            logout: "Выйти"
+            logout: "Выйти",
+            changePasscode: "Сменить код-пароль",
+            changePasscodeDesc: "Обновите 4-значный код блокировки. Сохраняется на сервере.",
+            currentPasscode: "Текущий",
+            newPasscode: "Новый",
+            confirmPasscode: "Подтверждение",
+            updatePasscode: "Обновить код",
+            passcodeUpdated: "Код обновлён!",
+            passcodeMismatch: "Новые коды не совпадают",
+            passcodeWrong: "Неверный текущий код",
+            passcodeInvalid: "Код должен состоять из 4 цифр",
+            passcodeNoUser: "Аккаунт не найден"
         }
     };
 
@@ -215,6 +259,19 @@
         if (settingsCopyLabel) settingsCopyLabel.textContent = dict.copy;
         const logoutBtnLabel = document.getElementById("logoutBtnLabel");
         if (logoutBtnLabel) logoutBtnLabel.textContent = dict.logout || "Log out";
+
+        const map = [
+            ["lblChangePasscode", "changePasscode"],
+            ["lblChangePasscodeDesc", "changePasscodeDesc"],
+            ["lblCurrentPasscode", "currentPasscode"],
+            ["lblNewPasscode", "newPasscode"],
+            ["lblConfirmPasscode", "confirmPasscode"],
+            ["changePasscodeBtn", "updatePasscode"],
+        ];
+        map.forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (el && dict[key]) el.textContent = dict[key];
+        });
     }
 
     function generateRecoveryPassword() {
@@ -329,8 +386,122 @@
         });
     }
 
+    /* ===== Change Passcode (server: public.passcode, beta elonmusk) ===== */
+    const changePasscodeBlock = document.getElementById("changePasscodeBlock");
+    const passcodeCurrent = document.getElementById("passcodeCurrent");
+    const passcodeNew = document.getElementById("passcodeNew");
+    const passcodeConfirm = document.getElementById("passcodeConfirm");
+    const changePasscodeBtn = document.getElementById("changePasscodeBtn");
+    const passcodeChangeError = document.getElementById("passcodeChangeError");
+
+    function digitsOnly(el) {
+        if (!el) return;
+        el.addEventListener("input", () => {
+            el.value = el.value.replace(/\D/g, "").slice(0, 4);
+        });
+    }
+    digitsOnly(passcodeCurrent);
+    digitsOnly(passcodeNew);
+    digitsOnly(passcodeConfirm);
+
+    function showPasscodeErr(msg) {
+        if (!passcodeChangeError) return;
+        if (!msg) {
+            passcodeChangeError.classList.add("hidden");
+            passcodeChangeError.textContent = "";
+            return;
+        }
+        passcodeChangeError.textContent = msg;
+        passcodeChangeError.classList.remove("hidden");
+    }
+
+    async function resolveMyUserId() {
+        let uid = localStorage.getItem("zchat_user_id") || "";
+        if (uid) return uid;
+        const uname = (localStorage.getItem("zchat_username") || "").trim();
+        if (!uname || !window.supabaseClient) return null;
+        const { data } = await window.supabaseClient
+            .from("users").select("id").ilike("username", uname).maybeSingle();
+        if (data && data.id) {
+            localStorage.setItem("zchat_user_id", data.id);
+            return data.id;
+        }
+        return null;
+    }
+
+    async function initChangePasscodeUI() {
+        const uname = (localStorage.getItem("zchat_username") || "").trim().toLowerCase();
+        if (!changePasscodeBlock) return;
+        // Beta: chỉ elonmusk
+        if (uname !== "elonmusk") {
+            changePasscodeBlock.classList.add("hidden");
+            return;
+        }
+        changePasscodeBlock.classList.remove("hidden");
+    }
+
+    if (changePasscodeBtn) {
+        changePasscodeBtn.addEventListener("click", async () => {
+            const lang = languageSelect.value || "en";
+            const dict = i18n[lang] || i18n.en;
+            showPasscodeErr("");
+
+            const cur = (passcodeCurrent && passcodeCurrent.value) || "";
+            const neu = (passcodeNew && passcodeNew.value) || "";
+            const conf = (passcodeConfirm && passcodeConfirm.value) || "";
+
+            if (!/^\d{4}$/.test(cur) || !/^\d{4}$/.test(neu) || !/^\d{4}$/.test(conf)) {
+                showPasscodeErr(dict.passcodeInvalid || "Passcode must be 4 digits");
+                return;
+            }
+            if (neu !== conf) {
+                showPasscodeErr(dict.passcodeMismatch || "New passcodes do not match");
+                return;
+            }
+            if (!window.supabaseClient) {
+                showPasscodeErr("Supabase unavailable");
+                return;
+            }
+
+            try {
+                const uid = await resolveMyUserId();
+                if (!uid) {
+                    showPasscodeErr(dict.passcodeNoUser || "Account not found");
+                    return;
+                }
+
+                const { data: row, error: fetchErr } = await window.supabaseClient
+                    .from("passcode")
+                    .select("user_id, passcode")
+                    .eq("user_id", uid)
+                    .maybeSingle();
+                if (fetchErr) throw fetchErr;
+
+                if (!row || String(row.passcode) !== cur) {
+                    showPasscodeErr(dict.passcodeWrong || "Current passcode is incorrect");
+                    return;
+                }
+
+                const { error: upErr } = await window.supabaseClient
+                    .from("passcode")
+                    .update({ passcode: neu, updated_at: new Date().toISOString() })
+                    .eq("user_id", uid);
+                if (upErr) throw upErr;
+
+                if (passcodeCurrent) passcodeCurrent.value = "";
+                if (passcodeNew) passcodeNew.value = "";
+                if (passcodeConfirm) passcodeConfirm.value = "";
+                showToast(dict.passcodeUpdated || "Passcode updated!");
+            } catch (e) {
+                console.error("[Passcode] change:", e);
+                showPasscodeErr(e.message || "Update failed");
+            }
+        });
+    }
+
     loadSettings();
     loadProfileData();
     syncAvatarFromAccount();
+    initChangePasscodeUI();
     if (window.lucide) window.lucide.createIcons();
 })();
