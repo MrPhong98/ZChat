@@ -1790,7 +1790,15 @@ function getVerifiedBadge(isVerified) {
                 ? `<i data-lucide="timer" class="w-[11px] h-[11px] shrink-0" style="color: var(--faint); opacity: 0.85;" title="Disappearing message"></i>`
                 : "";
 
-            const seenHtml = isMine ? statusIconMarkup(msg.status) : "";
+            // Seen chỉ dưới tin CUỐI của mình (và chỉ khi status === read)
+            let seenHtml = "";
+            if (isMine) {
+                let lastMineIdx = -1;
+                for (let j = msgs.length - 1; j >= 0; j--) {
+                    if (msgs[j].senderId === "me") { lastMineIdx = j; break; }
+                }
+                if (i === lastMineIdx) seenHtml = statusIconMarkup(msg.status);
+            }
             const metaInner = `${timerIcon}${seenHtml}`;
             const hasMetaContent = !!timerIcon || !!seenHtml;
 
