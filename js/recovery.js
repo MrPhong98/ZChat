@@ -1,9 +1,6 @@
 /**
- * ZChat Passcode Lock (beta)
- * - Chỉ username "elonmusk"
- * - 4 ô tròn + bàn phím thiết bị (không keypad trên màn hình)
- * - Sai 20 lần → khoá 30s (đếm ngược đỏ)
- * - Theme theo settings (dark/light)
+ * ZChat Passcode Lock (beta) — elonmusk only
+ * Mỗi lần vào web: main.js redirect → nhập passcode → one-shot token → app
  */
 (function () {
     "use strict";
@@ -12,12 +9,11 @@
     const MAX_ATTEMPTS = 20;
     const LOCK_SECONDS = 30;
     const APP_URL = "index.html";
-
     const LS_SESSION = "zchat_passcode_ok";
     const LS_FAILS = "zchat_passcode_fails";
     const LS_LOCK_UNTIL = "zchat_passcode_lock_until";
 
-    let mode = "enter"; // create | confirm | enter
+    let mode = "enter";
     let buffer = "";
     let firstPass = "";
     let lockedUntil = 0;
@@ -36,14 +32,8 @@
     const hiddenInput = $("passHiddenInput");
     const dotsHit = $("passDotsHit");
 
-    function username() {
-        return (localStorage.getItem("zchat_username") || "").trim();
-    }
-
-    function userId() {
-        return localStorage.getItem("zchat_user_id") || null;
-    }
-
+    function username() { return (localStorage.getItem("zchat_username") || "").trim(); }
+    function userId() { return localStorage.getItem("zchat_user_id") || null; }
     function canUsePasscodeBeta(name) {
         return String(name || "").trim().toLowerCase() === BETA_USERNAME;
     }
@@ -51,9 +41,7 @@
     function applyThemeFromSettings() {
         try {
             const t = localStorage.getItem("zchat_theme") || localStorage.getItem("theme") || "system";
-            const dark =
-                t === "dark" ||
-                (t !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+            const dark = t === "dark" || (t !== "light" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
             document.documentElement.classList.toggle("dark", !!dark);
             document.documentElement.dataset.theme = dark ? "dark" : "light";
         } catch (_) {}
@@ -80,8 +68,7 @@
 
     function renderDots(errorFlash) {
         if (!dotsWrap) return;
-        const dots = dotsWrap.querySelectorAll(".pass-dot");
-        dots.forEach((d, i) => {
+        dotsWrap.querySelectorAll(".pass-dot").forEach((d, i) => {
             d.classList.toggle("filled", i < buffer.length);
             d.classList.toggle("error", !!errorFlash && i < 4);
         });
@@ -93,35 +80,19 @@
     }
 
     function hideError() {
-        if (errorEl) {
-            errorEl.classList.add("hidden");
-            errorEl.textContent = "";
-        }
+        if (errorEl) { errorEl.classList.add("hidden"); errorEl.textContent = ""; }
     }
-
     function showError(msg) {
-        if (errorEl) {
-            errorEl.textContent = msg;
-            errorEl.classList.remove("hidden");
-        }
+        if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove("hidden"); }
     }
 
-    function getFailCount() {
-        return parseInt(sessionStorage.getItem(LS_FAILS) || "0", 10) || 0;
-    }
-
-    function setFailCount(n) {
-        sessionStorage.setItem(LS_FAILS, String(n));
-    }
+    function getFailCount() { return parseInt(sessionStorage.getItem(LS_FAILS) || "0", 10) || 0; }
+    function setFailCount(n) { sessionStorage.setItem(LS_FAILS, String(n)); }
 
     function updateAttemptsHint() {
         const n = getFailCount();
         if (!attemptsEl) return;
-        if (n > 0 && n < MAX_ATTEMPTS) {
-            attemptsEl.textContent = `${MAX_ATTEMPTS - n} attempts left`;
-        } else {
-            attemptsEl.textContent = "";
-        }
+        attemptsEl.textContent = (n > 0 && n < MAX_ATTEMPTS) ? `${MAX_ATTEMPTS - n} attempts left` : "";
     }
 
     function setInputEnabled(on) {
@@ -132,11 +103,7 @@
 
     function focusInput() {
         if (!hiddenInput || hiddenInput.disabled) return;
-        try {
-            hiddenInput.focus({ preventScroll: true });
-        } catch (_) {
-            hiddenInput.focus();
-        }
+        try { hiddenInput.focus({ preventScroll: true }); } catch (_) { hiddenInput.focus(); }
     }
 
     function startLock(seconds) {
@@ -159,18 +126,14 @@
             sessionStorage.removeItem(LS_LOCK_UNTIL);
             setFailCount(0);
             setInputEnabled(true);
-            if (timerEl) {
-                timerEl.classList.add("hidden");
-                timerEl.textContent = "";
-            }
+            if (timerEl) { timerEl.classList.add("hidden"); timerEl.textContent = ""; }
             hideError();
             updateAttemptsHint();
             return;
         }
-        const sec = Math.ceil(left / 1000);
         if (timerEl) {
             timerEl.classList.remove("hidden");
-            timerEl.textContent = `0:${String(sec).padStart(2, "0")}`;
+            timerEl.textContent = `0:${String(Math.ceil(left / 1000)).padStart(2, "0")}`;
         }
     }
 
@@ -197,23 +160,15 @@
         try {
             if (uid) {
                 const { data, error } = await window.supabaseClient
-                    .from("passcode")
-                    .select("user_id, username, passcode")
-                    .eq("user_id", uid)
-                    .maybeSingle();
+                    .from("passcode").select("user_id, username, passcode").eq("user_id", uid).maybeSingle();
                 if (!error && data) return data;
             }
             if (uname) {
                 const { data, error } = await window.supabaseClient
-                    .from("passcode")
-                    .select("user_id, username, passcode")
-                    .ilike("username", uname)
-                    .maybeSingle();
+                    .from("passcode").select("user_id, username, passcode").ilike("username", uname).maybeSingle();
                 if (!error && data) return data;
             }
-        } catch (e) {
-            console.error("[Passcode] fetch:", e);
-        }
+        } catch (e) { console.error("[Passcode] fetch:", e); }
         return null;
     }
 
@@ -222,35 +177,28 @@
         let uid = userId();
         const uname = username();
         if (!uid && uname) {
-            const { data } = await window.supabaseClient
-                .from("users")
-                .select("id")
-                .ilike("username", uname)
-                .maybeSingle();
+            const { data } = await window.supabaseClient.from("users").select("id").ilike("username", uname).maybeSingle();
             if (data && data.id) {
                 uid = data.id;
                 localStorage.setItem("zchat_user_id", uid);
             }
         }
         if (!uid) throw new Error("Missing user_id — hãy đăng nhập trước");
-
-        const row = {
+        const { error } = await window.supabaseClient.from("passcode").upsert({
             user_id: uid,
             username: uname,
             passcode: code,
             updated_at: new Date().toISOString(),
-        };
-        const { error } = await window.supabaseClient
-            .from("passcode")
-            .upsert(row, { onConflict: "user_id" });
+        }, { onConflict: "user_id" });
         if (error) throw error;
     }
 
     function unlockAndGo() {
+        // One-shot: main.js sẽ xoá ngay sau khi enterApp
         sessionStorage.setItem(LS_SESSION, "1");
         setFailCount(0);
         sessionStorage.removeItem(LS_LOCK_UNTIL);
-        window.location.href = APP_URL;
+        window.location.replace(APP_URL);
     }
 
     async function onComplete(code) {
@@ -262,17 +210,13 @@
                 setMode("confirm");
                 return;
             }
-
             if (mode === "confirm") {
                 if (code !== firstPass) {
                     showError("Passcodes do not match");
                     renderDots(true);
                     buffer = "";
                     if (hiddenInput) hiddenInput.value = "";
-                    setTimeout(() => {
-                        setMode("create");
-                        firstPass = "";
-                    }, 450);
+                    setTimeout(() => { setMode("create"); firstPass = ""; }, 450);
                     return;
                 }
                 try {
@@ -288,7 +232,6 @@
                 return;
             }
 
-            // enter
             try {
                 const row = await fetchPasscodeRow();
                 if (!row || !row.passcode) {
@@ -300,7 +243,6 @@
                     unlockAndGo();
                     return;
                 }
-
                 const fails = getFailCount() + 1;
                 setFailCount(fails);
                 updateAttemptsHint();
@@ -309,7 +251,6 @@
                 buffer = "";
                 if (hiddenInput) hiddenInput.value = "";
                 setTimeout(() => renderDots(false), 400);
-
                 if (fails >= MAX_ATTEMPTS) startLock(LOCK_SECONDS);
                 else focusInput();
             } catch (e) {
@@ -338,34 +279,19 @@
     }
 
     function bindInput() {
-        if (dotsHit) {
-            dotsHit.addEventListener("click", focusInput);
-        }
+        if (dotsHit) dotsHit.addEventListener("click", focusInput);
         document.addEventListener("click", () => {
             if (!hiddenInput || hiddenInput.disabled) return;
-            // Giữ focus để luôn gõ được
             if (document.activeElement !== hiddenInput) focusInput();
         });
-
         if (hiddenInput) {
-            hiddenInput.addEventListener("input", () => {
-                setBufferFromDigits(hiddenInput.value);
-            });
-            hiddenInput.addEventListener("keydown", (e) => {
-                if (e.key === "Escape") {
-                    buffer = "";
-                    hiddenInput.value = "";
-                    renderDots();
-                }
-            });
+            hiddenInput.addEventListener("input", () => setBufferFromDigits(hiddenInput.value));
         }
-
-        // Desktop: bắt phím ngay cả khi input chưa focus
         window.addEventListener("keydown", (e) => {
             if (lockedUntil && Date.now() < lockedUntil) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             if (e.key >= "0" && e.key <= "9") {
-                if (document.activeElement === hiddenInput) return; // input handler lo
+                if (document.activeElement === hiddenInput) return;
                 e.preventDefault();
                 setBufferFromDigits(buffer + e.key);
             } else if (e.key === "Backspace") {
@@ -378,36 +304,27 @@
 
     async function init() {
         applyThemeFromSettings();
-
         const name = username();
         if (!name) {
-            window.location.href = APP_URL;
+            window.location.replace(APP_URL);
             return;
         }
-
         if (!canUsePasscodeBeta(name)) {
             if (screen) screen.classList.add("hidden");
             if (betaBlocked) betaBlocked.classList.remove("hidden");
             return;
         }
 
-        if (sessionStorage.getItem(LS_SESSION) === "1") {
-            window.location.href = APP_URL;
-            return;
-        }
-
+        // Luôn hiện màn nhập — không skip theo session cũ
         bindInput();
         updateAttemptsHint();
-
         if (restoreLockIfNeeded()) {
             setMode("enter");
             return;
         }
-
         const row = await fetchPasscodeRow();
         if (row && row.passcode) setMode("enter");
         else setMode("create");
-
         focusInput();
     }
 
@@ -415,18 +332,10 @@
         canUsePasscodeBeta,
         init,
         needsUnlock: function () {
-            const name = username();
-            if (!canUsePasscodeBeta(name)) return false;
-            return sessionStorage.getItem(LS_SESSION) !== "1";
-        },
-        clearSession: function () {
-            sessionStorage.removeItem(LS_SESSION);
+            return canUsePasscodeBeta(username());
         },
     };
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
-    } else {
-        init();
-    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
 })();
