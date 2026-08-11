@@ -1,6 +1,6 @@
 /**
  * ZChat Passcode Lock (beta) — elonmusk only
- * Mỗi lần vào web: main.js redirect → nhập passcode → one-shot token → app
+ * public.passcode: user_id + passcode (no username column)
  */
 (function () {
     "use strict";
@@ -153,40 +153,47 @@
         return false;
     }
 
+    async function resolveUserId() {
+        let uid = userId();
+        if (uid) return uid;
+        const uname = username();
+        if (!window.supabaseClient || !uname) return null;
+        const { data } = await window.supabaseClient
+            .from("users").select("id").ilike("username", uname).maybeSingle();
+        if (data && data.id) {
+            localStorage.setItem("zchat_user_id", data.id);
+            return data.id;
+        }
+        return null;
+    }
+
     async function fetchPasscodeRow() {
         if (!window.supabaseClient) return null;
-        const uid = userId();
-        const uname = username();
         try {
-            if (uid) {
-                const { data, error } = await window.supabaseClient
-                    .from("passcode").select("user_id, username, passcode").eq("user_id", uid).maybeSingle();
-                if (!error && data) return data;
+            const uid = await resolveUserId();
+            if (!uid) return null;
+            const { data, error } = await window.supabaseClient
+                .from("passcode")
+                .select("user_id, passcode")
+                .eq("user_id", uid)
+                .maybeSingle();
+            if (error) {
+                console.error("[Passcode] fetch:", error);
+                return null;
             }
-            if (uname) {
-                const { data, error } = await window.supabaseClient
-                    .from("passcode").select("user_id, username, passcode").ilike("username", uname).maybeSingle();
-                if (!error && data) return data;
-            }
-        } catch (e) { console.error("[Passcode] fetch:", e); }
-        return null;
+            return data;
+        } catch (e) {
+            console.error("[Passcode] fetch:", e);
+            return null;
+        }
     }
 
     async function savePasscode(code) {
         if (!window.supabaseClient) throw new Error("Supabase missing");
-        let uid = userId();
-        const uname = username();
-        if (!uid && uname) {
-            const { data } = await window.supabaseClient.from("users").select("id").ilike("username", uname).maybeSingle();
-            if (data && data.id) {
-                uid = data.id;
-                localStorage.setItem("zchat_user_id", uid);
-            }
-        }
+        const uid = await resolveUserId();
         if (!uid) throw new Error("Missing user_id — hãy đăng nhập trước");
         const { error } = await window.supabaseClient.from("passcode").upsert({
             user_id: uid,
-            username: uname,
             passcode: code,
             updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
@@ -194,7 +201,6 @@
     }
 
     function unlockAndGo() {
-        // One-shot: main.js sẽ xoá ngay sau khi enterApp
         sessionStorage.setItem(LS_SESSION, "1");
         setFailCount(0);
         sessionStorage.removeItem(LS_LOCK_UNTIL);
@@ -315,7 +321,6 @@
             return;
         }
 
-        // Luôn hiện màn nhập — không skip theo session cũ
         bindInput();
         updateAttemptsHint();
         if (restoreLockIfNeeded()) {
@@ -328,13 +333,7 @@
         focusInput();
     }
 
-    window.ZChatPasscode = {
-        canUsePasscodeBeta,
-        init,
-        needsUnlock: function () {
-            return canUsePasscodeBeta(username());
-        },
-    };
+    window.ZChatPasscode = { canUsePasscodeBeta, init };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
