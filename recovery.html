@@ -33,13 +33,50 @@
     </script>
     <style>
         html, body { background-color: var(--canvas); color: var(--ink); }
+
+        /* Viền tròn lớn — khi nhập: chấm trắng nhỏ giữa (giống mock) */
         .pass-dot {
-            width: 18px; height: 18px; border-radius: 999px;
-            border: 2px solid var(--muted); background: transparent;
-            transition: background-color .12s ease, border-color .12s ease, transform .12s ease;
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: transparent;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color .12s ease;
         }
-        .pass-dot.filled { background-color: var(--ink); border-color: var(--ink); transform: scale(1.06); }
-        .pass-dot.error { border-color: #ef4444; background-color: #ef4444; }
+        html:not(.dark) .pass-dot,
+        html[data-theme="light"] .pass-dot {
+            border-color: rgba(0, 0, 0, 0.35);
+        }
+        .pass-dot.filled {
+            background: transparent;
+            border-color: rgba(255, 255, 255, 0.55);
+        }
+        html:not(.dark) .pass-dot.filled,
+        html[data-theme="light"] .pass-dot.filled {
+            border-color: rgba(0, 0, 0, 0.45);
+        }
+        .pass-dot.filled::after {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #ffffff;
+            display: block;
+        }
+        html:not(.dark) .pass-dot.filled::after,
+        html[data-theme="light"] .pass-dot.filled::after {
+            background: #111111;
+        }
+        .pass-dot.error {
+            border-color: #ef4444 !important;
+        }
+        .pass-dot.error.filled::after {
+            background: #ef4444;
+        }
         .pass-shake { animation: pass-shake .4s ease; }
         @keyframes pass-shake {
             0%, 100% { transform: translateX(0); }
@@ -68,7 +105,7 @@
 
         <div id="passDotsHit" class="relative mt-10 mb-2 px-6 py-4" role="group" aria-label="Passcode">
             <input id="passHiddenInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" enterkeyhint="done" aria-label="Passcode digits"/>
-            <div id="passDots" class="flex items-center justify-center gap-5 pointer-events-none">
+            <div id="passDots" class="flex items-center justify-center gap-6 pointer-events-none">
                 <div class="pass-dot" data-i="0"></div>
                 <div class="pass-dot" data-i="1"></div>
                 <div class="pass-dot" data-i="2"></div>
