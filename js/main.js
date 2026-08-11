@@ -2494,7 +2494,7 @@ function getVerifiedBadge(isVerified) {
         }
         cancelReplyMode();
 
-        // status "delivered" ngay — tránh setTimeout renderMessages 2 lần (mọi bubble bị rebuild)
+        // Giữ plaintext local; status delivered — không setTimeout renderMessages (tránh chớp + race UPDATE)
         const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "delivered" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
@@ -3332,37 +3332,38 @@ function getVerifiedBadge(isVerified) {
                             }
                         }
 
-                        // Tránh trùng theo id server
+                        // Trùng id server
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
+
+                        const ts = new Date(newMsg.created_at).getTime();
+                        const isMineMsg = newMsg.sender_username === me;
+
+                        // Tin optimistic của mình (id m_*) — chỉ gắn UUID, GIỮ plaintext, không render lại
+                        if (isMineMsg) {
+                            const pending = [...chat.messages].reverse().find((m) =>
+                                m.senderId === "me" &&
+                                typeof m.id === "string" &&
+                                (m.id.startsWith("m_") || m.status === "sending" || m.status === "delivered") &&
+                                Math.abs((m.createdAt || 0) - ts) < 60000
+                            );
+                            if (pending) {
+                                pending.id = newMsg.id;
+                                pending.status = "read";
+                                // Không đụng pending.text (đang là chữ thường)
+                                return;
+                            }
+                        }
 
                         let rtText = newMsg.content || "";
                         if (window.ZChatE2EE && rtText) {
                             try {
+                                await window.ZChatE2EE.ensureUserKeys(me);
                                 const priv = window.ZChatE2EE.getLocalPrivateKey();
                                 if (priv) {
                                     const plain = await window.ZChatE2EE.safeDecryptContent(rtText, priv);
                                     if (plain != null) rtText = plain;
                                 }
                             } catch (_) {}
-                        }
-
-                        const ts = new Date(newMsg.created_at).getTime();
-                        const isMineMsg = newMsg.sender_username === me;
-
-                        // Tin mình vừa gửi optimistic (id local m_*) — chỉ gắn UUID server, KHÔNG push thêm / render lại
-                        if (isMineMsg) {
-                            const pending = [...chat.messages].reverse().find((m) =>
-                                m.senderId === "me" &&
-                                typeof m.id === "string" &&
-                                m.id.startsWith("m_") &&
-                                Math.abs((m.createdAt || 0) - ts) < 20000
-                            );
-                            if (pending) {
-                                pending.id = newMsg.id;
-                                pending.status = "read";
-                                // Không gọi renderMessages — tránh chớp toàn bộ bubble
-                                return;
-                            }
                         }
 
                         chat.messages.push({
@@ -3390,17 +3391,20 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
+                        const chatId = updatedMsg.chat_id;
+                        if (!chatId || !meLower) return;
 
-                        // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
-                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+                        if (!isChatIdMine(chatId, meLower) &&
+                            !(isUuid(chatId) && state.chats.some((c) => c.id === chatId))) {
+                            return;
+                        }
 
                         const chat = state.chats.find((c) => c.id === chatId);
                         if (!chat) return;
@@ -3408,14 +3412,34 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        const contentChanged = (updatedMsg.content || "") !== msg.text;
-                        if (contentChanged) {
-                            msg.text = updatedMsg.content || "";
-                            msg.isEdited = true;
-                        }
-
+                        // Chỉ cập nhật Seen — KHÔNG ghi content mã hóa đè plaintext
                         if (updatedMsg.read_at && msg.status !== "read") {
                             msg.status = "read";
+                        }
+
+                        const rawContent = updatedMsg.content || "";
+                        if (rawContent) {
+                            let plain = rawContent;
+                            if (window.ZChatE2EE) {
+                                try {
+                                    await window.ZChatE2EE.ensureUserKeys(me);
+                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                    if (priv) {
+                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
+                                        if (d != null) plain = d;
+                                    }
+                                } catch (_) {}
+                            }
+                            // Chỉ coi là sửa tin khi plaintext thật sự đổi
+                            if (plain !== msg.text && plain !== rawContent) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                            } else if (plain !== msg.text && plain === rawContent) {
+                                // Không gán ciphertext vào UI
+                            } else if (plain !== msg.text) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                            }
                         }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
