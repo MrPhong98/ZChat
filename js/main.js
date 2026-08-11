@@ -458,32 +458,56 @@ function getVerifiedBadge(isVerified) {
         return id;
     }
 
+    /** Saved Messages: conversations.id (text) = saved_{userUuid} */
     function getSavedMessagesChatId(userId) {
         const uid = userId || myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-        return uid ? `saved_${uid}` : null;
+        return uid ? ("saved_" + uid) : null;
     }
 
+    /**
+     * Ghi Saved Messages vào public.conversations:
+     * id (text) = saved_{uuid}, user_1 = user_2 = uuid, created_at
+     */
     async function ensureSavedMessagesConversation(userId) {
         if (!window.supabaseClient || !userId) return null;
-        const convId = `saved_${userId}`;
+        const convId = "saved_" + userId;
         try {
-            const { data: existing } = await window.supabaseClient
+            const { data: existing, error: selErr } = await window.supabaseClient
                 .from("conversations")
                 .select("id")
                 .eq("id", convId)
                 .maybeSingle();
-            if (existing && existing.id) return convId;
-            const { error } = await window.supabaseClient.from("conversations").upsert({
+            if (!selErr && existing && existing.id) return convId;
+
+            const payload = {
                 id: convId,
                 user_1: userId,
                 user_2: userId,
                 created_at: new Date().toISOString(),
-            }, { onConflict: "id" });
-            if (error) console.warn("[ZChat] ensureSavedMessagesConversation:", error.message || error);
+            };
+
+            // Thử insert trước
+            let { error: insErr } = await window.supabaseClient
+                .from("conversations")
+                .insert([payload]);
+
+            if (insErr) {
+                // Fallback upsert
+                const up = await window.supabaseClient
+                    .from("conversations")
+                    .upsert(payload, { onConflict: "id" });
+                insErr = up.error;
+            }
+
+            if (insErr) {
+                console.error("[ZChat] ensureSavedMessagesConversation FAILED:", insErr);
+                return null;
+            }
+            console.log("[ZChat] Saved Messages conversation created:", convId);
             return convId;
         } catch (e) {
-            console.warn("[ZChat] ensureSavedMessagesConversation exception:", e);
-            return convId;
+            console.error("[ZChat] ensureSavedMessagesConversation exception:", e);
+            return null;
         }
     }
 
@@ -646,12 +670,12 @@ function getVerifiedBadge(isVerified) {
 
     function ensureSavedMessagesChat() {
         const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-        const savedChatId = uid ? `saved_${uid}` : null;
+        const savedChatId = uid ? ("saved_" + uid) : null;
         if (!savedChatId) return null;
 
         const meLower = (currentUsername || localStorage.getItem("zchat_username") || "").toLowerCase();
         if (meLower) {
-            const legacyId = `saved_${meLower}`;
+            const legacyId = "saved_" + meLower;
             if (legacyId !== savedChatId) {
                 const legacyIdx = state.chats.findIndex((c) => c.id === legacyId);
                 if (legacyIdx !== -1) {
@@ -675,7 +699,7 @@ function getVerifiedBadge(isVerified) {
         if (!savedChat) {
             savedChat = {
                 id: savedChatId,
-                participant: { id: `u_saved_${uid}`, name: "Saved Messages", online: true, lastSeen: null, userId: uid },
+                participant: { id: "u_saved_" + uid, name: "Saved Messages", online: true, lastSeen: null, userId: uid },
                 unread: 0,
                 disappearingTime: "off",
                 blockScreenshots: false,
@@ -2747,7 +2771,7 @@ function getVerifiedBadge(isVerified) {
 
             const PREVIEW_PER_CHAT = 5;
             const myId = await getMyUserId();
-            const mySavedChatId = myId ? `saved_${myId}` : null;
+            const mySavedChatId = myId ? ("saved_" + myId) : null;
             if (myId) {
                 ensureSavedMessagesChat();
                 await ensureSavedMessagesConversation(myId);
@@ -2770,9 +2794,7 @@ function getVerifiedBadge(isVerified) {
                     console.warn("[ZChat] load conversations:", e);
                 }
             }
-            const convIds = convRows
-                .map((c) => c.id)
-                .filter((id) => id && !String(id).startsWith("saved_"));
+            const convIds = convRows.map((c) => c.id).filter((id) => id && !String(id).startsWith("saved_"));
 
             // Resolve username đối phương từ user_1 / user_2 (tránh hiện "Chat User")
             const otherIds = [];
@@ -3097,11 +3119,14 @@ function getVerifiedBadge(isVerified) {
         if (isSavedChat) {
             const myId = await getMyUserId();
             if (!myId) {
-                console.error("[ZChat] postMessage: missing user id for Saved Messages");
+                console.error("[ZChat] postMessage Saved Messages: missing user id");
                 return;
             }
-            realChatId = `saved_${myId}`;
-            await ensureSavedMessagesConversation(myId);
+            realChatId = "saved_" + myId;
+            const convOk = await ensureSavedMessagesConversation(myId);
+            if (!convOk) {
+                console.error("[ZChat] postMessage: could not upsert Saved Messages into conversations");
+            }
             if (currentChat && currentChat.id !== realChatId) {
                 currentChat.id = realChatId;
                 if (state.activeChatId === chatId) state.activeChatId = realChatId;
@@ -3276,8 +3301,8 @@ function getVerifiedBadge(isVerified) {
         if (!chatId || !meLower) return false;
         if (chatId.startsWith("saved_")) {
             const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-            if (uid && chatId === `saved_${uid}`) return true;
-            if (chatId === `saved_${meLower}`) return true; // legacy đọc
+            if (uid && chatId === ("saved_" + uid)) return true;
+            if (chatId === ("saved_" + meLower)) return true;
             return false;
         }
         if (chatId.startsWith("chat_")) {
@@ -3361,7 +3386,7 @@ function getVerifiedBadge(isVerified) {
                         // Không bao giờ nhét tin 1-1 vào Saved Messages
                         if (String(chatId).startsWith("saved_")) {
                             const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-                            const mineSaved = (uid && chatId === `saved_${uid}`) || chatId === `saved_${meLower}`;
+                            const mineSaved = (uid && chatId === ("saved_" + uid)) || chatId === ("saved_" + meLower);
                             if (!mineSaved) return;
                         }
 
@@ -3427,7 +3452,7 @@ function getVerifiedBadge(isVerified) {
                             if (pending) {
                                 pending.id = newMsg.id;
                                 pending.status = "read";
-                                return; // giữ plaintext, không render lại
+                                return;
                             }
                         }
 
