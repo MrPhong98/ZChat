@@ -34,12 +34,12 @@
     <style>
         html, body { background-color: var(--canvas); color: var(--ink); }
 
-        /* Viền tròn lớn — khi nhập: chấm trắng nhỏ giữa (giống mock) */
+        /* Viền xám to hơn + chấm giữa khi đã nhập */
         .pass-dot {
-            width: 22px;
-            height: 22px;
+            width: 28px;
+            height: 28px;
             border-radius: 999px;
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            border: 2.5px solid rgba(160, 160, 160, 0.85);
             background: transparent;
             box-sizing: border-box;
             display: inline-flex;
@@ -49,20 +49,20 @@
         }
         html:not(.dark) .pass-dot,
         html[data-theme="light"] .pass-dot {
-            border-color: rgba(0, 0, 0, 0.35);
+            border-color: rgba(120, 120, 120, 0.75);
         }
         .pass-dot.filled {
             background: transparent;
-            border-color: rgba(255, 255, 255, 0.55);
+            border-color: rgba(160, 160, 160, 0.95);
         }
         html:not(.dark) .pass-dot.filled,
         html[data-theme="light"] .pass-dot.filled {
-            border-color: rgba(0, 0, 0, 0.45);
+            border-color: rgba(100, 100, 100, 0.9);
         }
         .pass-dot.filled::after {
             content: "";
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
             border-radius: 999px;
             background: #ffffff;
             display: block;
@@ -105,7 +105,7 @@
 
         <div id="passDotsHit" class="relative mt-10 mb-2 px-6 py-4" role="group" aria-label="Passcode">
             <input id="passHiddenInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" enterkeyhint="done" aria-label="Passcode digits"/>
-            <div id="passDots" class="flex items-center justify-center gap-6 pointer-events-none">
+            <div id="passDots" class="flex items-center justify-center gap-7 pointer-events-none">
                 <div class="pass-dot" data-i="0"></div>
                 <div class="pass-dot" data-i="1"></div>
                 <div class="pass-dot" data-i="2"></div>
