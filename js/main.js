@@ -458,59 +458,6 @@ function getVerifiedBadge(isVerified) {
         return id;
     }
 
-    /** Saved Messages: conversations.id (text) = saved_{userUuid} */
-    function getSavedMessagesChatId(userId) {
-        const uid = userId || myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-        return uid ? ("saved_" + uid) : null;
-    }
-
-    /**
-     * Ghi Saved Messages vào public.conversations:
-     * id (text) = saved_{uuid}, user_1 = user_2 = uuid, created_at
-     */
-    async function ensureSavedMessagesConversation(userId) {
-        if (!window.supabaseClient || !userId) return null;
-        const convId = "saved_" + userId;
-        try {
-            const { data: existing, error: selErr } = await window.supabaseClient
-                .from("conversations")
-                .select("id")
-                .eq("id", convId)
-                .maybeSingle();
-            if (!selErr && existing && existing.id) return convId;
-
-            const payload = {
-                id: convId,
-                user_1: userId,
-                user_2: userId,
-                created_at: new Date().toISOString(),
-            };
-
-            // Thử insert trước
-            let { error: insErr } = await window.supabaseClient
-                .from("conversations")
-                .insert([payload]);
-
-            if (insErr) {
-                // Fallback upsert
-                const up = await window.supabaseClient
-                    .from("conversations")
-                    .upsert(payload, { onConflict: "id" });
-                insErr = up.error;
-            }
-
-            if (insErr) {
-                console.error("[ZChat] ensureSavedMessagesConversation FAILED:", insErr);
-                return null;
-            }
-            console.log("[ZChat] Saved Messages conversation created:", convId);
-            return convId;
-        } catch (e) {
-            console.error("[ZChat] ensureSavedMessagesConversation exception:", e);
-            return null;
-        }
-    }
-
     /**
      * Tạo / lấy id phòng chat 1-1 từ 2 user UUID.
      * Ưu tiên RPC get_or_create_conversation; fallback insert/select bảng conversations.
@@ -668,38 +615,16 @@ function getVerifiedBadge(isVerified) {
         searchQuery: "",
     };
 
+    // Hàm tạo hoặc đồng bộ Saved Messages theo user hiện tại
     function ensureSavedMessagesChat() {
-        const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-        const savedChatId = uid ? ("saved_" + uid) : null;
-        if (!savedChatId) return null;
-
-        const meLower = (currentUsername || localStorage.getItem("zchat_username") || "").toLowerCase();
-        if (meLower) {
-            const legacyId = "saved_" + meLower;
-            if (legacyId !== savedChatId) {
-                const legacyIdx = state.chats.findIndex((c) => c.id === legacyId);
-                if (legacyIdx !== -1) {
-                    const leg = state.chats[legacyIdx];
-                    state.chats.splice(legacyIdx, 1);
-                    if (state.activeChatId === legacyId) state.activeChatId = savedChatId;
-                    let target = state.chats.find((c) => c.id === savedChatId);
-                    if (!target) {
-                        leg.id = savedChatId;
-                        state.chats.unshift(leg);
-                    } else if (leg.messages && leg.messages.length) {
-                        leg.messages.forEach((m) => {
-                            if (!target.messages.some((x) => x.id === m.id)) target.messages.push(m);
-                        });
-                    }
-                }
-            }
-        }
+        const user = (currentUsername || localStorage.getItem("zchat_username") || "guest").toLowerCase();
+        const savedChatId = `saved_${user}`;
 
         let savedChat = state.chats.find((c) => c.id === savedChatId);
         if (!savedChat) {
             savedChat = {
                 id: savedChatId,
-                participant: { id: "u_saved_" + uid, name: "Saved Messages", online: true, lastSeen: null, userId: uid },
+                participant: { id: `u_${user}`, name: "Saved Messages", online: true, lastSeen: null },
                 unread: 0,
                 disappearingTime: "off",
                 blockScreenshots: false,
@@ -707,7 +632,9 @@ function getVerifiedBadge(isVerified) {
             };
             state.chats.unshift(savedChat);
         }
-        if (!state.activeChatId) state.activeChatId = savedChatId;
+        if (!state.activeChatId) {
+            state.activeChatId = savedChatId;
+        }
         return savedChatId;
     }
 
@@ -1173,21 +1100,27 @@ function getVerifiedBadge(isVerified) {
         );
         if (!confirmed) return;
 
+        // Xoá trên Database trước (bảng messages theo chat_id)
+        if (window.supabaseClient) {
+            try {
+                const { error } = await window.supabaseClient
+                    .from("messages")
+                    .delete()
+                    .eq("chat_id", chatId);
+                if (error) {
+                    console.error("[ZChat] clearConversation DB error:", error);
+                    // Vẫn clear local để UI không kẹt; user xem console nếu RLS chặn
+                }
+            } catch (err) {
+                console.error("[ZChat] clearConversation exception:", err);
+            }
+        }
+
         chat.messages = [];
         chat.unread = 0;
 
         if (state.activeChatId === chat.id) renderMessages(chat);
         renderChatList();
-
-        if (window.supabaseClient) {
-            try {
-                const { error } = await window.supabaseClient
-                    .rpc("clear_conversation", { p_chat_id: chatId });
-                if (error) console.error("[ZChat] clearConversation error:", error);
-            } catch (err) {
-                console.error("[ZChat] clearConversation exception:", err);
-            }
-        }
     }
     function closeChatListMenu() {
         const existing = document.getElementById("zchatChatListMenu");
@@ -1807,7 +1740,7 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
+            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full fade-in " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
@@ -1863,14 +1796,7 @@ function getVerifiedBadge(isVerified) {
                 ? `<i data-lucide="timer" class="w-[11px] h-[11px] shrink-0" style="color: var(--faint); opacity: 0.85;" title="Disappearing message"></i>`
                 : "";
 
-            let seenHtml = "";
-            if (isMine) {
-                let lastMineIdx = -1;
-                for (let j = msgs.length - 1; j >= 0; j--) {
-                    if (msgs[j].senderId === "me") { lastMineIdx = j; break; }
-                }
-                if (i === lastMineIdx) seenHtml = statusIconMarkup(msg.status);
-            }
+            const seenHtml = isMine ? statusIconMarkup(msg.status) : "";
             const metaInner = `${timerIcon}${seenHtml}`;
             const hasMetaContent = !!timerIcon || !!seenHtml;
 
@@ -1964,7 +1890,7 @@ function getVerifiedBadge(isVerified) {
     function renderTypingIndicator(chat) {
         const wrap = document.createElement("div");
         wrap.id = "typingIndicator";
-        wrap.className = "flex w-full justify-start mb-3";
+        wrap.className = "flex w-full justify-start fade-in mb-3";
         wrap.innerHTML = `
       <div class="rounded-bubble rounded-bl-md px-4 py-3 flex items-center gap-1" style="background-color: var(--elevated);">
         <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
@@ -2574,7 +2500,7 @@ function getVerifiedBadge(isVerified) {
         }
         cancelReplyMode();
 
-        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "delivered" };
+        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "sending" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
         scheduleDisappearing(chat, msg);
@@ -2585,6 +2511,18 @@ function getVerifiedBadge(isVerified) {
 
         renderMessages(chat);
         renderChatList();
+
+        // Cập nhật trạng thái gửi thành công (dấu tick)
+        setTimeout(() => {
+            msg.status = "sent";
+            if (state.activeChatId === chat.id) renderMessages(chat);
+        }, 500);
+
+        setTimeout(() => {
+            msg.status = "delivered";
+            if (state.activeChatId === chat.id) renderMessages(chat);
+            renderChatList();
+        }, 1400);
     }
 
     attachBtn.addEventListener("click", () => fileInput.click());
@@ -2767,15 +2705,11 @@ function getVerifiedBadge(isVerified) {
         try {
             const me = currentUsername || localStorage.getItem("zchat_username") || "";
             const meLower = me.toLowerCase();
+            const mySavedChatId = `saved_${meLower}`;
             if (!meLower) return;
 
             const PREVIEW_PER_CHAT = 5;
             const myId = await getMyUserId();
-            const mySavedChatId = myId ? ("saved_" + myId) : null;
-            if (myId) {
-                ensureSavedMessagesChat();
-                await ensureSavedMessagesConversation(myId);
-            }
 
             // 1) Danh sách conversation UUID của mình
             let convRows = [];
@@ -2794,14 +2728,13 @@ function getVerifiedBadge(isVerified) {
                     console.warn("[ZChat] load conversations:", e);
                 }
             }
-            const convIds = convRows.map((c) => c.id).filter((id) => id && !String(id).startsWith("saved_"));
+            const convIds = convRows.map((c) => c.id).filter(Boolean);
 
             // Resolve username đối phương từ user_1 / user_2 (tránh hiện "Chat User")
             const otherIds = [];
             const convOtherId = Object.create(null); // convId → otherUserId
             for (const c of convRows) {
                 if (!c || !c.id || !myId) continue;
-                if (String(c.id).startsWith("saved_")) continue;
                 const otherId = String(c.user_1) === String(myId) ? c.user_2 : c.user_1;
                 if (otherId) {
                     convOtherId[c.id] = otherId;
@@ -3117,20 +3050,8 @@ function getVerifiedBadge(isVerified) {
             String(chatId || "").startsWith("saved_");
 
         if (isSavedChat) {
-            const myId = await getMyUserId();
-            if (!myId) {
-                console.error("[ZChat] postMessage Saved Messages: missing user id");
-                return;
-            }
-            realChatId = "saved_" + myId;
-            const convOk = await ensureSavedMessagesConversation(myId);
-            if (!convOk) {
-                console.error("[ZChat] postMessage: could not upsert Saved Messages into conversations");
-            }
-            if (currentChat && currentChat.id !== realChatId) {
-                currentChat.id = realChatId;
-                if (state.activeChatId === chatId) state.activeChatId = realChatId;
-            }
+            // Chỉ Saved Messages của CHÍNH mình
+            realChatId = `saved_${me.toLowerCase()}`;
         } else if (isUuid(chatId)) {
             // Đã là conversations.id
             realChatId = chatId;
@@ -3299,12 +3220,7 @@ function getVerifiedBadge(isVerified) {
        vô tình (hoặc realtime broadcast) làm lộ / gộp nhầm đoạn chat của 2 người khác. */
     function isChatIdMine(chatId, meLower) {
         if (!chatId || !meLower) return false;
-        if (chatId.startsWith("saved_")) {
-            const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-            if (uid && chatId === ("saved_" + uid)) return true;
-            if (chatId === ("saved_" + meLower)) return true;
-            return false;
-        }
+        if (chatId.startsWith("saved_")) return chatId === `saved_${meLower}`;
         if (chatId.startsWith("chat_")) {
             const rest = chatId.slice(5);
             return rest === meLower || rest.startsWith(meLower + "_") || rest.endsWith("_" + meLower);
@@ -3384,11 +3300,7 @@ function getVerifiedBadge(isVerified) {
                         if (!mine) return;
 
                         // Không bao giờ nhét tin 1-1 vào Saved Messages
-                        if (String(chatId).startsWith("saved_")) {
-                            const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-                            const mineSaved = (uid && chatId === ("saved_" + uid)) || chatId === ("saved_" + meLower);
-                            if (!mineSaved) return;
-                        }
+                        if (String(chatId).startsWith("saved_") && chatId !== `saved_${meLower}`) return;
 
                         let chat = state.chats.find((c) => c.id === chatId);
 
@@ -3437,29 +3349,12 @@ function getVerifiedBadge(isVerified) {
                             }
                         }
 
+                        // Tránh trùng (tin mình vừa gửi local)
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
-
-                        const ts = new Date(newMsg.created_at).getTime();
-                        const isMineMsg = newMsg.sender_username === me;
-
-                        if (isMineMsg) {
-                            const pending = [...chat.messages].reverse().find((m) =>
-                                m.senderId === "me" &&
-                                typeof m.id === "string" &&
-                                (m.id.startsWith("m_") || m.status === "sending" || m.status === "delivered") &&
-                                Math.abs((m.createdAt || 0) - ts) < 60000
-                            );
-                            if (pending) {
-                                pending.id = newMsg.id;
-                                pending.status = "read";
-                                return;
-                            }
-                        }
 
                         let rtText = newMsg.content || "";
                         if (window.ZChatE2EE && rtText) {
                             try {
-                                await window.ZChatE2EE.ensureUserKeys(me);
                                 const priv = window.ZChatE2EE.getLocalPrivateKey();
                                 if (priv) {
                                     const plain = await window.ZChatE2EE.safeDecryptContent(rtText, priv);
@@ -3467,12 +3362,11 @@ function getVerifiedBadge(isVerified) {
                                 }
                             } catch (_) {}
                         }
-
                         chat.messages.push({
                             id: newMsg.id,
-                            senderId: isMineMsg ? "me" : newMsg.sender_username || "other",
+                            senderId: newMsg.sender_username === me ? "me" : newMsg.sender_username || "other",
                             text: rtText,
-                            createdAt: ts,
+                            createdAt: new Date(newMsg.created_at).getTime(),
                             status: "read",
                         });
                         chat.messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -3481,7 +3375,7 @@ function getVerifiedBadge(isVerified) {
                             renderMessages(chat);
                             if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
                             markChatAsRead(chat.id);
-                        } else if (!isMineMsg) {
+                        } else if (newMsg.sender_username !== me) {
                             chat.unread = (chat.unread || 0) + 1;
                         }
                         renderChatList();
@@ -3493,20 +3387,17 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                async (payload) => {
+                (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.chat_id;
-                        if (!chatId || !meLower) return;
+                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
 
-                        if (!isChatIdMine(chatId, meLower) &&
-                            !(typeof isUuid === "function" && isUuid(chatId) && state.chats.some((c) => c.id === chatId))) {
-                            return;
-                        }
+                        // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
+                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
 
                         const chat = state.chats.find((c) => c.id === chatId);
                         if (!chat) return;
@@ -3514,32 +3405,14 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        if (updatedMsg.read_at && msg.status !== "read") {
-                            msg.status = "read";
+                        const contentChanged = (updatedMsg.content || "") !== msg.text;
+                        if (contentChanged) {
+                            msg.text = updatedMsg.content || "";
+                            msg.isEdited = true;
                         }
 
-                        const rawContent = updatedMsg.content || "";
-                        if (rawContent) {
-                            let plain = rawContent;
-                            if (window.ZChatE2EE) {
-                                try {
-                                    await window.ZChatE2EE.ensureUserKeys(me);
-                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
-                                    if (priv) {
-                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
-                                        if (d != null) plain = d;
-                                    }
-                                } catch (_) {}
-                            }
-                            const stillCipher =
-                                plain === rawContent &&
-                                window.ZChatE2EE &&
-                                typeof window.ZChatE2EE.looksLikeE2eePayload === "function" &&
-                                window.ZChatE2EE.looksLikeE2eePayload(rawContent);
-                            if (!stillCipher && plain !== msg.text) {
-                                msg.text = plain;
-                                msg.isEdited = true;
-                            }
+                        if (updatedMsg.read_at && msg.status !== "read") {
+                            msg.status = "read";
                         }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
