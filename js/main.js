@@ -396,7 +396,7 @@ function getVerifiedBadge(isVerified) {
         participant.avatarEmoji = row.avatar_emoji || null;
         participant.avatarUrl = row.avatar_url || null;
         participant.isVerified = !!row.is_verified;
-        if (row.username && !participant.isSelfNotes && participant.name !== "Saved Messages") {
+        if (row.username && participant.name !== "Saved Messages") {
             participant.name = row.username;
         }
     }
@@ -456,27 +456,6 @@ function getVerifiedBadge(isVerified) {
             localStorage.setItem("zchat_user_id", id);
         }
         return id;
-    }
-
-    async function ensureSavedMessagesConversation(userId) {
-        if (!window.supabaseClient || !userId) return null;
-        const convId = "saved_" + userId;
-        try {
-            const { data: existing } = await window.supabaseClient
-                .from("conversations").select("id").eq("id", convId).maybeSingle();
-            if (existing && existing.id) return convId;
-            const { error } = await window.supabaseClient.from("conversations").upsert({
-                id: convId,
-                user_1: userId,
-                user_2: userId,
-                created_at: new Date().toISOString(),
-            }, { onConflict: "id" });
-            if (error) console.error("[ZChat] ensureSavedMessagesConversation:", error);
-            return convId;
-        } catch (e) {
-            console.error("[ZChat] ensureSavedMessagesConversation:", e);
-            return null;
-        }
     }
 
     /**
@@ -570,7 +549,7 @@ function getVerifiedBadge(isVerified) {
         const names = [...new Set(
             state.chats
                 .map((c) => c.participant && c.participant.name)
-                .filter((n) => n && n !== "Saved Messages" && !(typeof isSelfNotesChatId === "function" && false))
+                .filter((n) => n && n !== "Saved Messages")
         )];
         if (!names.length) return;
 
@@ -636,69 +615,26 @@ function getVerifiedBadge(isVerified) {
         searchQuery: "",
     };
 
-    /** Chat "ghi chú" = chat với chính mình (tên + avatar user), chat_id = saved_{userId} */
-    function isSelfNotesChatId(chatId) {
-        return typeof chatId === "string" && chatId.startsWith("saved_");
-    }
-
-    function isSelfNotesChat(chat) {
-        if (!chat) return false;
-        if (isSelfNotesChatId(chat.id)) return true;
-        return !!(chat.participant && chat.participant.isSelfNotes);
-    }
-
+    // Hàm tạo hoặc đồng bộ Saved Messages theo user hiện tại
     function ensureSavedMessagesChat() {
-        const displayName = (currentUsername || localStorage.getItem("zchat_username") || "Me").trim();
-        const uid = myUserIdCache || localStorage.getItem("zchat_user_id") || "";
-        // Ưu tiên saved_{uuid}; fallback tạm saved_{username} nếu chưa có id
-        const savedChatId = uid ? ("saved_" + uid) : ("saved_" + displayName.toLowerCase());
+        const user = (currentUsername || localStorage.getItem("zchat_username") || "guest").toLowerCase();
+        const savedChatId = `saved_${user}`;
 
-        // Đổi tên slot cũ "Saved Messages" / legacy id
-        state.chats.forEach((c) => {
-            if (!c) return;
-            if (c.participant && c.participant.name === "Saved Messages") {
-                c.participant.name = displayName;
-                c.participant.isSelfNotes = true;
-            }
-            if (uid && c.id === ("saved_" + displayName.toLowerCase()) && c.id !== savedChatId) {
-                c.id = savedChatId;
-            }
-        });
-
-        let savedChat = state.chats.find((c) => c.id === savedChatId || isSelfNotesChat(c));
+        let savedChat = state.chats.find((c) => c.id === savedChatId);
         if (!savedChat) {
             savedChat = {
                 id: savedChatId,
-                participant: {
-                    id: uid ? ("u_" + uid) : ("u_" + displayName.toLowerCase()),
-                    name: displayName,
-                    online: true,
-                    lastSeen: null,
-                    userId: uid || null,
-                    isSelfNotes: true,
-                },
+                participant: { id: `u_${user}`, name: "Saved Messages", online: true, lastSeen: null },
                 unread: 0,
                 disappearingTime: "off",
                 blockScreenshots: false,
                 messages: [],
             };
             state.chats.unshift(savedChat);
-        } else {
-            savedChat.id = savedChatId;
-            savedChat.participant = savedChat.participant || {};
-            savedChat.participant.name = displayName;
-            savedChat.participant.isSelfNotes = true;
-            if (uid) savedChat.participant.userId = uid;
         }
-
-        // Đồng bộ avatar từ local (profile) — giống avatar mình
-        const p = savedChat.participant;
-        p.avatarType = localStorage.getItem("zchat_avatar_type") || p.avatarType || "initials";
-        p.avatarColor = localStorage.getItem("zchat_avatar_color") || p.avatarColor || null;
-        p.avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || p.avatarEmoji || null;
-        p.avatarUrl = localStorage.getItem("zchat_avatar_url") || p.avatarUrl || null;
-
-        if (!state.activeChatId) state.activeChatId = savedChatId;
+        if (!state.activeChatId) {
+            state.activeChatId = savedChatId;
+        }
         return savedChatId;
     }
 
@@ -928,15 +864,6 @@ function getVerifiedBadge(isVerified) {
                 localStorage.setItem("zchat_recovery_password", data.recovery_password);
             }
             applyLocalAvatarToUI();
-            // Cập nhật avatar chat "tên mình" (self-notes)
-            try {
-                ensureSavedMessagesChat();
-                renderChatList();
-                if (state.activeChatId && isSelfNotesChatId(state.activeChatId)) {
-                    const c = state.chats.find((x) => x.id === state.activeChatId);
-                    if (c) renderActiveChat();
-                }
-            } catch (_) {}
         } catch (err) {
             console.error("[ZChat] syncMyAvatarFromServer error:", err);
         }
@@ -1104,7 +1031,19 @@ function getVerifiedBadge(isVerified) {
 
     function avatarHtml(participant, size) {
         size = size || 44;
-        // Self-notes dùng avatar thường (tên mình), không còn icon Saved Messages
+        const isSaved = participant && (participant.id.startsWith("u_") && participant.name === "Saved Messages");
+
+        if (isSaved) {
+            const iconSize = Math.round(size * 0.48);
+            return `
+      <div class="relative shrink-0" style="width:${size}px;height:${size}px">
+        <div class="flex h-full w-full items-center justify-center rounded-full select-none" style="background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); color: #fff;">
+          <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5v15.2a.8.8 0 0 1-1.28.64L12 16.3l-4.72 4.04A.8.8 0 0 1 6 19.7V4.5Z" fill="currentColor"/>
+          </svg>
+        </div>
+      </div>`;
+        }
 
         const innerAvatar = (participant.avatarType === "photo" && participant.avatarUrl)
             ? `<img src="${participant.avatarUrl}" alt="${initials(participant.name)}" class="h-full w-full rounded-full object-cover select-none" />`
@@ -1795,7 +1734,7 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full fade-in " + (isMine ? "justify-end" : "justify-start");
+            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
@@ -1945,7 +1884,7 @@ function getVerifiedBadge(isVerified) {
     function renderTypingIndicator(chat) {
         const wrap = document.createElement("div");
         wrap.id = "typingIndicator";
-        wrap.className = "flex w-full justify-start fade-in mb-3";
+        wrap.className = "flex w-full justify-start mb-3";
         wrap.innerHTML = `
       <div class="rounded-bubble rounded-bl-md px-4 py-3 flex items-center gap-1" style="background-color: var(--elevated);">
         <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
@@ -2027,7 +1966,7 @@ function getVerifiedBadge(isVerified) {
         const preview = document.getElementById("safetyNumberPreview");
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (preview) {
-            preview.textContent = (!chat || isSelfNotesChat(chat))
+            preview.textContent = (!chat || chat.participant.name === "Saved Messages")
                 ? "Not available" : "Tap to verify encryption";
         }
     }
@@ -2257,7 +2196,7 @@ function getVerifiedBadge(isVerified) {
     async function openSafetyNumberModal() {
         const chat = state.chats.find((c) => c.id === state.activeChatId);
         if (!safetyNumberModal || !chat) return;
-        if (isSelfNotesChat(chat)) return;
+        if (chat.participant.name === "Saved Messages") return;
 
         const grid = document.getElementById("safetyNumberGrid");
         const hint = document.getElementById("safetyNumberHint");
@@ -2555,7 +2494,7 @@ function getVerifiedBadge(isVerified) {
         }
         cancelReplyMode();
 
-        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "sending" };
+        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "delivered" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
         scheduleDisappearing(chat, msg);
@@ -2566,18 +2505,6 @@ function getVerifiedBadge(isVerified) {
 
         renderMessages(chat);
         renderChatList();
-
-        // Cập nhật trạng thái gửi thành công (dấu tick)
-        setTimeout(() => {
-            msg.status = "sent";
-            if (state.activeChatId === chat.id) renderMessages(chat);
-        }, 500);
-
-        setTimeout(() => {
-            msg.status = "delivered";
-            if (state.activeChatId === chat.id) renderMessages(chat);
-            renderChatList();
-        }, 1400);
     }
 
     attachBtn.addEventListener("click", () => fileInput.click());
@@ -2760,15 +2687,11 @@ function getVerifiedBadge(isVerified) {
         try {
             const me = currentUsername || localStorage.getItem("zchat_username") || "";
             const meLower = me.toLowerCase();
+            const mySavedChatId = `saved_${meLower}`;
             if (!meLower) return;
 
             const PREVIEW_PER_CHAT = 5;
             const myId = await getMyUserId();
-            const mySavedChatId = myId ? ("saved_" + myId) : ("saved_" + meLower);
-            ensureSavedMessagesChat();
-            if (myId && typeof ensureSavedMessagesConversation === "function") {
-                try { await ensureSavedMessagesConversation(myId); } catch (_) {}
-            }
 
             // 1) Danh sách conversation UUID của mình
             let convRows = [];
@@ -2979,9 +2902,7 @@ function getVerifiedBadge(isVerified) {
             state.chats.forEach((chat) => {
                 if (chat.participant.name !== "Chat User" && chat.participant.name) return;
                 if (String(chat.id).startsWith("saved_")) {
-                    const meName = (currentUsername || localStorage.getItem("zchat_username") || "Me").trim();
-                    chat.participant.name = meName;
-                    chat.participant.isSelfNotes = true;
+                    chat.participant.name = "Saved Messages";
                     return;
                 }
                 const fromMsg = chat.messages.find(
@@ -3107,23 +3028,12 @@ function getVerifiedBadge(isVerified) {
         let realChatId = chatId;
 
         const isSavedChat =
-            (currentChat && isSelfNotesChat(currentChat)) ||
+            (currentChat && currentChat.participant.name === "Saved Messages") ||
             String(chatId || "").startsWith("saved_");
 
         if (isSavedChat) {
-            const myId = await getMyUserId();
-            realChatId = myId ? ("saved_" + myId) : ("saved_" + me.toLowerCase());
-            if (myId && typeof ensureSavedMessagesConversation === "function") {
-                try { await ensureSavedMessagesConversation(myId); } catch (_) {}
-            }
-            if (currentChat && currentChat.id !== realChatId) {
-                currentChat.id = realChatId;
-                if (state.activeChatId === chatId) state.activeChatId = realChatId;
-            }
-            if (currentChat && currentChat.participant) {
-                currentChat.participant.name = me;
-                currentChat.participant.isSelfNotes = true;
-            }
+            // Chỉ Saved Messages của CHÍNH mình
+            realChatId = `saved_${me.toLowerCase()}`;
         } else if (isUuid(chatId)) {
             // Đã là conversations.id
             realChatId = chatId;
@@ -3133,8 +3043,8 @@ function getVerifiedBadge(isVerified) {
                     ? currentChat.participant.name
                     : ""
             ).trim();
-            if (!otherUser || (currentChat && isSelfNotesChat(currentChat))) {
-                console.error("[ZChat] postMessage: missing partner");
+            if (!otherUser || otherUser === "Saved Messages") {
+                console.error("[ZChat] postMessage: missing partner — không ghi vào saved");
                 return;
             }
             const myId = await getMyUserId();
@@ -3172,7 +3082,7 @@ function getVerifiedBadge(isVerified) {
         }
 
         let contentToStore = msgObj.text || msgObj.attachment || "";
-        if (window.ZChatE2EE && contentToStore && currentChat && !isSelfNotesChat(currentChat)) {
+        if (window.ZChatE2EE && contentToStore && currentChat && currentChat.participant.name !== "Saved Messages") {
             try {
                 await window.ZChatE2EE.ensureUserKeys(me);
                 const partner = await window.ZChatE2EE.fetchPublicKeyForUsername(currentChat.participant.name);
@@ -3269,18 +3179,13 @@ function getVerifiedBadge(isVerified) {
                     console.error("[ZChat] Image upload failed — no public URL");
                 }
             } else {
-                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "sending" };
+                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "delivered" };
                 chat.messages.push(msg);
                 postMessageToSupabase(msg, chat.id);
                 scheduleDisappearing(chat, msg);
 
                 renderMessages(chat);
                 renderChatList();
-
-                setTimeout(() => {
-                    msg.status = "delivered";
-                    if (state.activeChatId === chat.id) renderMessages(chat);
-                }, 900);
             }
 
             fileInput.value = "";
@@ -3327,9 +3232,7 @@ function getVerifiedBadge(isVerified) {
     function resolveOtherNameFromChatId(chatId, me, senderUsername) {
         const meL = (me || "").toLowerCase();
         if (!chatId) return senderUsername && senderUsername.toLowerCase() !== meL ? senderUsername : "Chat User";
-        if (chatId.startsWith("saved_")) {
-            return (currentUsername || localStorage.getItem("zchat_username") || me || "Me").trim();
-        }
+        if (chatId.startsWith("saved_")) return "Saved Messages";
         if (chatId.startsWith("chat_")) {
             const rest = chatId.slice(5);
             if (meL && rest.startsWith(meL + "_")) return rest.slice(meL.length + 1);
@@ -3382,7 +3285,7 @@ function getVerifiedBadge(isVerified) {
                         if (!chat) {
                             let otherName;
                             if (String(chatId).startsWith("saved_")) {
-                                otherName = me || "Me";
+                                otherName = "Saved Messages";
                             } else {
                                 otherName = resolveOtherNameFromChatId(chatId, me, newMsg.sender_username);
                                 if (isUuid(chatId) && (otherName === "Chat User" || !otherName)) {
@@ -3423,12 +3326,29 @@ function getVerifiedBadge(isVerified) {
                             }
                         }
 
-                        // Tránh trùng (tin mình vừa gửi local)
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
+
+                        const ts = new Date(newMsg.created_at).getTime();
+                        const isMineMsg = newMsg.sender_username === me;
+
+                        if (isMineMsg) {
+                            const pending = [...chat.messages].reverse().find((m) =>
+                                m.senderId === "me" &&
+                                typeof m.id === "string" &&
+                                (m.id.startsWith("m_") || m.status === "sending" || m.status === "delivered") &&
+                                Math.abs((m.createdAt || 0) - ts) < 60000
+                            );
+                            if (pending) {
+                                pending.id = newMsg.id;
+                                pending.status = "read";
+                                return; // không renderMessages → không flicker
+                            }
+                        }
 
                         let rtText = newMsg.content || "";
                         if (window.ZChatE2EE && rtText) {
                             try {
+                                await window.ZChatE2EE.ensureUserKeys(me);
                                 const priv = window.ZChatE2EE.getLocalPrivateKey();
                                 if (priv) {
                                     const plain = await window.ZChatE2EE.safeDecryptContent(rtText, priv);
@@ -3436,11 +3356,12 @@ function getVerifiedBadge(isVerified) {
                                 }
                             } catch (_) {}
                         }
+
                         chat.messages.push({
                             id: newMsg.id,
-                            senderId: newMsg.sender_username === me ? "me" : newMsg.sender_username || "other",
+                            senderId: isMineMsg ? "me" : newMsg.sender_username || "other",
                             text: rtText,
-                            createdAt: new Date(newMsg.created_at).getTime(),
+                            createdAt: ts,
                             status: "read",
                         });
                         chat.messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -3449,7 +3370,7 @@ function getVerifiedBadge(isVerified) {
                             renderMessages(chat);
                             if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
                             markChatAsRead(chat.id);
-                        } else if (newMsg.sender_username !== me) {
+                        } else if (!isMineMsg) {
                             chat.unread = (chat.unread || 0) + 1;
                         }
                         renderChatList();
@@ -3461,17 +3382,20 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
+                        const chatId = updatedMsg.chat_id;
+                        if (!chatId || !meLower) return;
 
-                        // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
-                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+                        if (!isChatIdMine(chatId, meLower) &&
+                            !(typeof isUuid === "function" && isUuid(chatId) && state.chats.some((c) => c.id === chatId))) {
+                            return;
+                        }
 
                         const chat = state.chats.find((c) => c.id === chatId);
                         if (!chat) return;
@@ -3479,18 +3403,43 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        const contentChanged = (updatedMsg.content || "") !== msg.text;
-                        if (contentChanged) {
-                            msg.text = updatedMsg.content || "";
-                            msg.isEdited = true;
-                        }
+                        let needRender = false;
 
                         if (updatedMsg.read_at && msg.status !== "read") {
                             msg.status = "read";
+                            needRender = true;
                         }
 
-                        if (state.activeChatId === chat.id) renderMessages(chat);
-                        renderChatList();
+                        const rawContent = updatedMsg.content || "";
+                        if (rawContent) {
+                            let plain = rawContent;
+                            if (window.ZChatE2EE) {
+                                try {
+                                    await window.ZChatE2EE.ensureUserKeys(me);
+                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                    if (priv) {
+                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
+                                        if (d != null) plain = d;
+                                    }
+                                } catch (_) {}
+                            }
+                            const stillCipher =
+                                plain === rawContent &&
+                                window.ZChatE2EE &&
+                                typeof window.ZChatE2EE.looksLikeE2eePayload === "function" &&
+                                window.ZChatE2EE.looksLikeE2eePayload(rawContent);
+                            if (!stillCipher && plain !== msg.text) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                                needRender = true;
+                            }
+                        }
+
+                        // Chỉ render khi nội dung/status thật sự đổi (Seen chỉ tin cuối — 1 lần)
+                        if (needRender) {
+                            if (state.activeChatId === chat.id) renderMessages(chat);
+                            renderChatList();
+                        }
                     } catch (err) {
                         console.error("[ZChat] Realtime UPDATE handler error:", err);
                     }
