@@ -1100,17 +1100,14 @@ function getVerifiedBadge(isVerified) {
         );
         if (!confirmed) return;
 
-        // Xoá trên Database trước (bảng messages theo chat_id)
+        // Xoá trên Database (messages theo chat_id)
         if (window.supabaseClient) {
             try {
                 const { error } = await window.supabaseClient
                     .from("messages")
                     .delete()
                     .eq("chat_id", chatId);
-                if (error) {
-                    console.error("[ZChat] clearConversation DB error:", error);
-                    // Vẫn clear local để UI không kẹt; user xem console nếu RLS chặn
-                }
+                if (error) console.error("[ZChat] clearConversation DB error:", error);
             } catch (err) {
                 console.error("[ZChat] clearConversation exception:", err);
             }
@@ -1740,7 +1737,7 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full fade-in " + (isMine ? "justify-end" : "justify-start");
+            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
@@ -1890,7 +1887,7 @@ function getVerifiedBadge(isVerified) {
     function renderTypingIndicator(chat) {
         const wrap = document.createElement("div");
         wrap.id = "typingIndicator";
-        wrap.className = "flex w-full justify-start fade-in mb-3";
+        wrap.className = "flex w-full justify-start mb-3";
         wrap.innerHTML = `
       <div class="rounded-bubble rounded-bl-md px-4 py-3 flex items-center gap-1" style="background-color: var(--elevated);">
         <span class="typing-dot w-1.5 h-1.5 rounded-full inline-block" style="background-color: var(--faint);"></span>
@@ -2500,7 +2497,7 @@ function getVerifiedBadge(isVerified) {
         }
         cancelReplyMode();
 
-        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "sending" };
+        const msg = { id: uid("m"), senderId: "me", text: finalText, createdAt: Date.now(), status: "delivered" };
         chat.messages.push(msg);
         postMessageToSupabase(msg, chat.id);
         scheduleDisappearing(chat, msg);
@@ -2511,18 +2508,6 @@ function getVerifiedBadge(isVerified) {
 
         renderMessages(chat);
         renderChatList();
-
-        // Cập nhật trạng thái gửi thành công (dấu tick)
-        setTimeout(() => {
-            msg.status = "sent";
-            if (state.activeChatId === chat.id) renderMessages(chat);
-        }, 500);
-
-        setTimeout(() => {
-            msg.status = "delivered";
-            if (state.activeChatId === chat.id) renderMessages(chat);
-            renderChatList();
-        }, 1400);
     }
 
     attachBtn.addEventListener("click", () => fileInput.click());
@@ -3349,12 +3334,30 @@ function getVerifiedBadge(isVerified) {
                             }
                         }
 
-                        // Tránh trùng (tin mình vừa gửi local)
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
+
+                        const ts = new Date(newMsg.created_at).getTime();
+                        const isMineMsg = newMsg.sender_username === me;
+
+                        // Tin optimistic của mình — giữ plaintext, không renderMessages lại
+                        if (isMineMsg) {
+                            const pending = [...chat.messages].reverse().find((m) =>
+                                m.senderId === "me" &&
+                                typeof m.id === "string" &&
+                                (m.id.startsWith("m_") || m.status === "sending" || m.status === "delivered") &&
+                                Math.abs((m.createdAt || 0) - ts) < 60000
+                            );
+                            if (pending) {
+                                pending.id = newMsg.id;
+                                pending.status = "read";
+                                return;
+                            }
+                        }
 
                         let rtText = newMsg.content || "";
                         if (window.ZChatE2EE && rtText) {
                             try {
+                                await window.ZChatE2EE.ensureUserKeys(me);
                                 const priv = window.ZChatE2EE.getLocalPrivateKey();
                                 if (priv) {
                                     const plain = await window.ZChatE2EE.safeDecryptContent(rtText, priv);
@@ -3362,11 +3365,12 @@ function getVerifiedBadge(isVerified) {
                                 }
                             } catch (_) {}
                         }
+
                         chat.messages.push({
                             id: newMsg.id,
-                            senderId: newMsg.sender_username === me ? "me" : newMsg.sender_username || "other",
+                            senderId: isMineMsg ? "me" : newMsg.sender_username || "other",
                             text: rtText,
-                            createdAt: new Date(newMsg.created_at).getTime(),
+                            createdAt: ts,
                             status: "read",
                         });
                         chat.messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -3375,7 +3379,7 @@ function getVerifiedBadge(isVerified) {
                             renderMessages(chat);
                             if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
                             markChatAsRead(chat.id);
-                        } else if (newMsg.sender_username !== me) {
+                        } else if (!isMineMsg) {
                             chat.unread = (chat.unread || 0) + 1;
                         }
                         renderChatList();
@@ -3387,17 +3391,20 @@ function getVerifiedBadge(isVerified) {
             .on(
                 "postgres_changes",
                 { event: "UPDATE", schema: "public", table: "messages" },
-                (payload) => {
+                async (payload) => {
                     try {
                         const updatedMsg = payload.new;
                         if (!updatedMsg) return;
 
                         const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
                         const meLower = me.toLowerCase();
-                        const chatId = updatedMsg.chat_id || `saved_${meLower}`;
+                        const chatId = updatedMsg.chat_id;
+                        if (!chatId || !meLower) return;
 
-                        // Chỉ xử lý nếu đoạn chat thực sự thuộc về mình
-                        if (!meLower || !isChatIdMine(chatId, meLower)) return;
+                        if (!isChatIdMine(chatId, meLower) &&
+                            !(typeof isUuid === "function" && isUuid(chatId) && state.chats.some((c) => c.id === chatId))) {
+                            return;
+                        }
 
                         const chat = state.chats.find((c) => c.id === chatId);
                         if (!chat) return;
@@ -3405,14 +3412,33 @@ function getVerifiedBadge(isVerified) {
                         const msg = chat.messages.find((m) => m.id === updatedMsg.id);
                         if (!msg) return;
 
-                        const contentChanged = (updatedMsg.content || "") !== msg.text;
-                        if (contentChanged) {
-                            msg.text = updatedMsg.content || "";
-                            msg.isEdited = true;
-                        }
-
                         if (updatedMsg.read_at && msg.status !== "read") {
                             msg.status = "read";
+                        }
+
+                        // Không ghi ciphertext đè plaintext; không gắn edited oan
+                        const rawContent = updatedMsg.content || "";
+                        if (rawContent) {
+                            let plain = rawContent;
+                            if (window.ZChatE2EE) {
+                                try {
+                                    await window.ZChatE2EE.ensureUserKeys(me);
+                                    const priv = window.ZChatE2EE.getLocalPrivateKey();
+                                    if (priv) {
+                                        const d = await window.ZChatE2EE.safeDecryptContent(rawContent, priv);
+                                        if (d != null) plain = d;
+                                    }
+                                } catch (_) {}
+                            }
+                            const stillCipher =
+                                plain === rawContent &&
+                                window.ZChatE2EE &&
+                                typeof window.ZChatE2EE.looksLikeE2eePayload === "function" &&
+                                window.ZChatE2EE.looksLikeE2eePayload(rawContent);
+                            if (!stillCipher && plain !== msg.text) {
+                                msg.text = plain;
+                                msg.isEdited = true;
+                            }
                         }
 
                         if (state.activeChatId === chat.id) renderMessages(chat);
