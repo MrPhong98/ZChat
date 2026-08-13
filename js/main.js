@@ -1439,7 +1439,8 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = currentText;
         messageInput.focus();
-        autoResizeMessageInput();
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
 
         if (editBar) {
             editBarPreview.textContent = currentText;
@@ -1457,8 +1458,7 @@ function getVerifiedBadge(isVerified) {
     function cancelEditMode() {
         editingMsgId = null;
         messageInput.value = "";
-        if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        messageInput.style.height = "auto";
 
         if (editBar) {
             editBar.classList.add("hidden");
@@ -1500,8 +1500,13 @@ function getVerifiedBadge(isVerified) {
         if (!msg) return "";
         const { body } = parseReply(msg.text || "");
         if (body.startsWith("[IMAGE]:")) return "📷 Photo";
-        if (msg.attachment) return `📎 ${msg.attachment}`;
-        return body;
+        if (msg.attachment) {
+            const a = String(msg.attachment);
+            return a.length > 48 ? ("📎 " + a.slice(0, 48) + "…") : ("📎 " + a);
+        }
+        const t = String(body || "").replace(/\s+/g, " ").trim();
+        if (t.length <= 72) return t;
+        return t.slice(0, 72).trimEnd() + "…";
     }
 
     function startReplyMessage(msgId) {
@@ -1807,10 +1812,12 @@ function getVerifiedBadge(isVerified) {
                 }
             }
 
+            let shortReply = String(replyPreview || "").replace(/\s+/g, " ").trim();
+            if (shortReply.length > 72) shortReply = shortReply.slice(0, 72).trimEnd() + "…";
             const replyQuoteHtml = replyId
                 ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
                      <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
-                     <span class="text-[11px] truncate opacity-70" style="color: var(--ink);">${escapeHtml(replyPreview)}</span>
+                     <span class="text-[11px] opacity-70 msg-reply-preview" style="color: var(--ink);">${escapeHtml(shortReply)}</span>
                    </div>`
                 : "";
 
@@ -2474,17 +2481,9 @@ function getVerifiedBadge(isVerified) {
         sendBtn.disabled = messageInput.value.trim().length === 0;
     }
 
-    function autoResizeMessageInput() {
-        if (!messageInput) return;
-        const maxH = Math.min(240, Math.round(window.innerHeight * 0.35));
-        messageInput.style.height = "auto";
-        const next = Math.min(messageInput.scrollHeight, maxH);
-        messageInput.style.height = next + "px";
-        messageInput.style.overflowY = messageInput.scrollHeight > maxH ? "auto" : "hidden";
-    }
-
     messageInput.addEventListener("input", () => {
-        autoResizeMessageInput();
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
         updateSendBtnState();
     });
 
@@ -2493,10 +2492,6 @@ function getVerifiedBadge(isVerified) {
             e.preventDefault();
             handleSend();
         }
-    });
-
-    window.addEventListener("resize", () => {
-        autoResizeMessageInput();
     });
 
     sendBtn.addEventListener("click", handleSend);
@@ -2553,8 +2548,7 @@ function getVerifiedBadge(isVerified) {
         scheduleDisappearing(chat, msg);
 
         messageInput.value = "";
-        if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        messageInput.style.height = "auto";
         updateSendBtnState();
 
         renderMessages(chat);
