@@ -1439,8 +1439,7 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = currentText;
         messageInput.focus();
-        messageInput.style.height = "auto";
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
+        autoResizeMessageInput();
 
         if (editBar) {
             editBarPreview.textContent = currentText;
@@ -1458,7 +1457,8 @@ function getVerifiedBadge(isVerified) {
     function cancelEditMode() {
         editingMsgId = null;
         messageInput.value = "";
-        messageInput.style.height = "auto";
+        if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
+        else messageInput.style.height = "auto";
 
         if (editBar) {
             editBar.classList.add("hidden");
@@ -1842,7 +1842,7 @@ function getVerifiedBadge(isVerified) {
                     : "");
 
             wrap.innerHTML = `
-        <div class="msg-bubble-col relative flex flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
+        <div class="relative flex max-w-[72%] flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
           ${bubble}
@@ -2474,9 +2474,17 @@ function getVerifiedBadge(isVerified) {
         sendBtn.disabled = messageInput.value.trim().length === 0;
     }
 
-    messageInput.addEventListener("input", () => {
+    function autoResizeMessageInput() {
+        if (!messageInput) return;
+        const maxH = Math.min(240, Math.round(window.innerHeight * 0.35));
         messageInput.style.height = "auto";
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
+        const next = Math.min(messageInput.scrollHeight, maxH);
+        messageInput.style.height = next + "px";
+        messageInput.style.overflowY = messageInput.scrollHeight > maxH ? "auto" : "hidden";
+    }
+
+    messageInput.addEventListener("input", () => {
+        autoResizeMessageInput();
         updateSendBtnState();
     });
 
@@ -2485,6 +2493,10 @@ function getVerifiedBadge(isVerified) {
             e.preventDefault();
             handleSend();
         }
+    });
+
+    window.addEventListener("resize", () => {
+        autoResizeMessageInput();
     });
 
     sendBtn.addEventListener("click", handleSend);
@@ -2541,7 +2553,8 @@ function getVerifiedBadge(isVerified) {
         scheduleDisappearing(chat, msg);
 
         messageInput.value = "";
-        messageInput.style.height = "auto";
+        if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
+        else messageInput.style.height = "auto";
         updateSendBtnState();
 
         renderMessages(chat);
