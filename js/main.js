@@ -1458,7 +1458,7 @@ function getVerifiedBadge(isVerified) {
         editingMsgId = null;
         messageInput.value = "";
         if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        else messageInput.style.height = "24px";
 
         if (editBar) {
             editBar.classList.add("hidden");
@@ -2476,11 +2476,30 @@ function getVerifiedBadge(isVerified) {
 
     function autoResizeMessageInput() {
         if (!messageInput) return;
-        const maxH = Math.min(240, Math.round(window.innerHeight * 0.35));
-        messageInput.style.height = "auto";
-        const next = Math.min(messageInput.scrollHeight, maxH);
-        messageInput.style.height = next + "px";
-        messageInput.style.overflowY = messageInput.scrollHeight > maxH ? "auto" : "hidden";
+        const shell = document.getElementById("composerShell");
+        // Reset về 1 dòng để đo
+        const singleLineHeight = 24;
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const maxHeight = Math.min(320, Math.max(96, Math.round(viewportHeight * 0.42)));
+
+        if (shell) shell.classList.remove("is-multiline");
+        messageInput.style.height = "0px";
+        messageInput.style.maxHeight = "none";
+        messageInput.style.overflowY = "hidden";
+
+        const contentHeight = messageInput.scrollHeight;
+        const isMultiline = contentHeight > singleLineHeight + 1;
+
+        if (!isMultiline) {
+            messageInput.style.height = singleLineHeight + "px";
+            messageInput.style.maxHeight = "";
+            return;
+        }
+
+        if (shell) shell.classList.add("is-multiline");
+        messageInput.style.maxHeight = maxHeight + "px";
+        messageInput.style.height = Math.min(contentHeight, maxHeight) + "px";
+        messageInput.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
     }
 
     messageInput.addEventListener("input", () => {
@@ -2488,15 +2507,16 @@ function getVerifiedBadge(isVerified) {
         updateSendBtnState();
     });
 
+    window.addEventListener("resize", autoResizeMessageInput);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", autoResizeMessageInput);
+    }
+
     messageInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             handleSend();
         }
-    });
-
-    window.addEventListener("resize", () => {
-        autoResizeMessageInput();
     });
 
     sendBtn.addEventListener("click", handleSend);
@@ -2554,7 +2574,7 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = "";
         if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        else messageInput.style.height = "24px";
         updateSendBtnState();
 
         renderMessages(chat);
