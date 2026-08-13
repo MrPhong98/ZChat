@@ -376,33 +376,3 @@ select.custom-select {
 #composerShell.is-multiline #messageInput {
     /* Height and overflow are set from JavaScript to fit the active viewport. */
 }
-
-/* Mobile composer and message wrapping. */
-@media (max-width: 639px) {
-    #messageFeed .msg-bubble-pressable {
-        min-width: 0;
-        max-width: calc(100% - 2.5rem);
-    }
-
-    #messageFeed .msg-bubble-pressable > .rounded-bubble {
-        max-width: 100%;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-    }
-
-    #composerShell {
-        height: 44px;
-        min-height: 44px;
-    }
-
-    #composerShell.is-multiline {
-        height: auto;
-        min-height: 44px;
-    }
-
-    #attachBtn {
-        width: 44px;
-        height: 44px;
-        margin-bottom: 0;
-    }
-}
