@@ -40,25 +40,6 @@ body { background-color: var(--canvas); color: var(--ink); transition: backgroun
 
 textarea { field-sizing: content; }
 
-/* Message composer: auto-grow textarea (PC / iPad / Mobile) */
-#composerShell {
-    transition: border-radius .12s ease;
-}
-#messageInput {
-    display: block;
-    width: 100%;
-    min-height: 24px;
-    max-height: min(240px, 35vh);
-    overflow-y: auto;
-    overflow-x: hidden;
-    line-height: 1.45;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    field-sizing: content;
-    box-sizing: border-box;
-}
-
-
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
 
 .typing-dot { animation: typing-dot 1.2s ease-in-out infinite; }
@@ -137,6 +118,29 @@ textarea { field-sizing: content; }
 .disappearing-option.is-selected .opt-icon-badge i {
     color: #1b98e0 !important;
     opacity: 1 !important;
+}
+
+
+/* Bong bóng tin nhắn dài: xuống dòng, không kéo ngang */
+#messageFeed .msg-bubble-col {
+    max-width: min(72%, 420px);
+    min-width: 0;
+}
+@media (max-width: 640px) {
+    #messageFeed .msg-bubble-col {
+        max-width: min(82%, 100%);
+    }
+}
+#messageFeed .rounded-bubble {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+    hyphens: auto;
+}
+#messageFeed .rounded-bubble img.msg-image {
+    max-width: min(260px, 100%);
 }
 
 /* Bong bóng chat của mình: xanh + chữ trắng (dark/light + ô reply bên trong) */
