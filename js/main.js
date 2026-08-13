@@ -1439,7 +1439,8 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = currentText;
         messageInput.focus();
-        autoResizeMessageInput();
+        messageInput.style.height = "auto";
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
 
         if (editBar) {
             editBarPreview.textContent = currentText;
@@ -1458,7 +1459,7 @@ function getVerifiedBadge(isVerified) {
         editingMsgId = null;
         messageInput.value = "";
         if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        else messageInput.style.height = "24px";
 
         if (editBar) {
             editBar.classList.add("hidden");
@@ -2476,11 +2477,18 @@ function getVerifiedBadge(isVerified) {
 
     function autoResizeMessageInput() {
         if (!messageInput) return;
-        const maxH = Math.min(240, Math.round(window.innerHeight * 0.35));
-        messageInput.style.height = "auto";
-        const next = Math.min(messageInput.scrollHeight, maxH);
-        messageInput.style.height = next + "px";
-        messageInput.style.overflowY = messageInput.scrollHeight > maxH ? "auto" : "hidden";
+        const shell = document.getElementById("composerShell");
+        // Reset về 1 dòng để đo
+        messageInput.style.height = "24px";
+        const sh = messageInput.scrollHeight;
+        if (sh > 28) {
+            if (shell) shell.classList.add("is-multiline");
+            const maxH = Math.min(140, Math.round(window.innerHeight * 0.3));
+            messageInput.style.height = Math.min(sh, maxH) + "px";
+        } else {
+            if (shell) shell.classList.remove("is-multiline");
+            messageInput.style.height = "24px";
+        }
     }
 
     messageInput.addEventListener("input", () => {
@@ -2493,10 +2501,6 @@ function getVerifiedBadge(isVerified) {
             e.preventDefault();
             handleSend();
         }
-    });
-
-    window.addEventListener("resize", () => {
-        autoResizeMessageInput();
     });
 
     sendBtn.addEventListener("click", handleSend);
@@ -2554,7 +2558,7 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = "";
         if (typeof autoResizeMessageInput === "function") autoResizeMessageInput();
-        else messageInput.style.height = "auto";
+        else messageInput.style.height = "24px";
         updateSendBtnState();
 
         renderMessages(chat);
