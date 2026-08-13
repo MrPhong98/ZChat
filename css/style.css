@@ -40,6 +40,25 @@ body { background-color: var(--canvas); color: var(--ink); transition: backgroun
 
 textarea { field-sizing: content; }
 
+/* Message composer: auto-grow textarea (PC / iPad / Mobile) */
+#composerShell {
+    transition: border-radius .12s ease;
+}
+#messageInput {
+    display: block;
+    width: 100%;
+    min-height: 24px;
+    max-height: min(240px, 35vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+    line-height: 1.45;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    field-sizing: content;
+    box-sizing: border-box;
+}
+
+
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
 
 .typing-dot { animation: typing-dot 1.2s ease-in-out infinite; }
