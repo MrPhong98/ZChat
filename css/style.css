@@ -40,25 +40,6 @@ body { background-color: var(--canvas); color: var(--ink); transition: backgroun
 
 textarea { field-sizing: content; }
 
-/* Message composer: auto-grow textarea (PC / iPad / Mobile) */
-#composerShell {
-    transition: border-radius .12s ease;
-}
-#messageInput {
-    display: block;
-    width: 100%;
-    min-height: 24px;
-    max-height: min(240px, 35vh);
-    overflow-y: auto;
-    overflow-x: hidden;
-    line-height: 1.45;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    field-sizing: content;
-    box-sizing: border-box;
-}
-
-
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
 
 .typing-dot { animation: typing-dot 1.2s ease-in-out infinite; }
@@ -355,4 +336,43 @@ select.custom-select {
 .zc-call-avatar-circle {
     border: 2px solid #6b7280 !important;
     box-sizing: border-box;
+}
+
+
+/* Composer: mỏng bằng nút + (40px), pill radius 9999px */
+#composerShell {
+    height: 40px;
+    min-height: 40px;
+    border-radius: 9999px !important;
+    box-sizing: border-box;
+    align-items: center;
+}
+#composerShell.is-multiline {
+    height: auto;
+    min-height: 40px;
+    align-items: flex-end;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    border-radius: 22px !important;
+}
+#messageInput {
+    display: block;
+    width: 100%;
+    height: 24px;
+    min-height: 24px;
+    line-height: 24px;
+    padding: 0 !important;
+    margin: 0;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    resize: none;
+    field-sizing: fixed;
+    border: none;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+#composerShell.is-multiline #messageInput {
+    /* Height and overflow are set from JavaScript to fit the active viewport. */
 }
