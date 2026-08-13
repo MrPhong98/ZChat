@@ -1496,20 +1496,12 @@ function getVerifiedBadge(isVerified) {
         };
     }
 
-    function truncatePreview(text, maxLen) {
-        maxLen = maxLen || 80;
-        const s = String(text || "").replace(/\s+/g, " ").trim();
-        if (!s) return "";
-        if (s.length <= maxLen) return s;
-        return s.slice(0, maxLen).trimEnd() + "…";
-    }
-
     function previewForMessage(msg) {
         if (!msg) return "";
         const { body } = parseReply(msg.text || "");
         if (body.startsWith("[IMAGE]:")) return "📷 Photo";
-        if (msg.attachment) return truncatePreview("📎 " + msg.attachment, 60);
-        return truncatePreview(body, 80);
+        if (msg.attachment) return `📎 ${msg.attachment}`;
+        return body;
     }
 
     function startReplyMessage(msgId) {
@@ -1815,11 +1807,10 @@ function getVerifiedBadge(isVerified) {
                 }
             }
 
-            const shortReplyPreview = truncatePreview(replyPreview, 80);
             const replyQuoteHtml = replyId
-                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1 min-w-0 max-w-full" data-reply-target="${replyId}">
-                     <span class="text-[11px] font-semibold truncate min-w-0" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
-                     <span class="msg-reply-preview text-[11px] opacity-70 min-w-0" style="color: var(--ink);">${escapeHtml(shortReplyPreview)}</span>
+                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
+                     <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
+                     <span class="text-[11px] truncate opacity-70" style="color: var(--ink);">${escapeHtml(replyPreview)}</span>
                    </div>`
                 : "";
 
@@ -1851,7 +1842,7 @@ function getVerifiedBadge(isVerified) {
                     : "");
 
             wrap.innerHTML = `
-        <div class="relative flex max-w-[72%] flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
+        <div class="msg-bubble-col relative flex flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
           ${bubble}
