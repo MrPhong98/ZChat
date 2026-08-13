@@ -1439,8 +1439,7 @@ function getVerifiedBadge(isVerified) {
 
         messageInput.value = currentText;
         messageInput.focus();
-        messageInput.style.height = "auto";
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 160) + "px";
+        autoResizeMessageInput();
 
         if (editBar) {
             editBarPreview.textContent = currentText;
@@ -2479,22 +2478,39 @@ function getVerifiedBadge(isVerified) {
         if (!messageInput) return;
         const shell = document.getElementById("composerShell");
         // Reset về 1 dòng để đo
-        messageInput.style.height = "24px";
-        const sh = messageInput.scrollHeight;
-        if (sh > 28) {
-            if (shell) shell.classList.add("is-multiline");
-            const maxH = Math.min(140, Math.round(window.innerHeight * 0.3));
-            messageInput.style.height = Math.min(sh, maxH) + "px";
-        } else {
-            if (shell) shell.classList.remove("is-multiline");
-            messageInput.style.height = "24px";
+        const singleLineHeight = 24;
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const maxHeight = Math.min(320, Math.max(96, Math.round(viewportHeight * 0.42)));
+
+        if (shell) shell.classList.remove("is-multiline");
+        messageInput.style.height = "0px";
+        messageInput.style.maxHeight = "none";
+        messageInput.style.overflowY = "hidden";
+
+        const contentHeight = messageInput.scrollHeight;
+        const isMultiline = contentHeight > singleLineHeight + 1;
+
+        if (!isMultiline) {
+            messageInput.style.height = singleLineHeight + "px";
+            messageInput.style.maxHeight = "";
+            return;
         }
+
+        if (shell) shell.classList.add("is-multiline");
+        messageInput.style.maxHeight = maxHeight + "px";
+        messageInput.style.height = Math.min(contentHeight, maxHeight) + "px";
+        messageInput.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
     }
 
     messageInput.addEventListener("input", () => {
         autoResizeMessageInput();
         updateSendBtnState();
     });
+
+    window.addEventListener("resize", autoResizeMessageInput);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", autoResizeMessageInput);
+    }
 
     messageInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
