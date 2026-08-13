@@ -3195,58 +3195,42 @@ function getVerifiedBadge(isVerified) {
 
     async function compressImageUnderLimit(file, maxBytes) {
         if (!file || file.size <= maxBytes) return file;
-
         const dataUrl = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = () => reject(new Error("read failed"));
             reader.readAsDataURL(file);
         });
-
         const img = await new Promise((resolve, reject) => {
             const image = new Image();
             image.onload = () => resolve(image);
             image.onerror = () => reject(new Error("image load failed"));
             image.src = dataUrl;
         });
-
         let width = img.naturalWidth || img.width;
         let height = img.naturalHeight || img.height;
         let quality = 0.92;
-        let mime = "image/jpeg";
-
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-
         for (let attempt = 0; attempt < 12; attempt++) {
             canvas.width = Math.max(1, Math.round(width));
             canvas.height = Math.max(1, Math.round(height));
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            const blob = await new Promise((resolve) => {
-                canvas.toBlob((b) => resolve(b), mime, quality);
-            });
+            const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", quality));
             if (!blob) break;
             if (blob.size <= maxBytes) {
                 const base = (file.name || "image").replace(/\.[^.]+$/, "");
                 return new File([blob], base + ".jpg", { type: "image/jpeg", lastModified: Date.now() });
             }
             if (quality > 0.45) quality -= 0.12;
-            else {
-                width *= 0.75;
-                height *= 0.75;
-                quality = Math.max(0.4, quality);
-            }
+            else { width *= 0.75; height *= 0.75; quality = Math.max(0.4, quality); }
         }
-
         canvas.width = Math.max(1, Math.round(width));
         canvas.height = Math.max(1, Math.round(height));
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const lastBlob = await new Promise((resolve) => {
-            canvas.toBlob((b) => resolve(b), "image/jpeg", 0.4);
-        });
+        const lastBlob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.4));
         if (!lastBlob) throw new Error("compress failed");
         const base = (file.name || "image").replace(/\.[^.]+$/, "");
         return new File([lastBlob], base + ".jpg", { type: "image/jpeg", lastModified: Date.now() });
@@ -3288,7 +3272,10 @@ function getVerifiedBadge(isVerified) {
     }
 
     if (fileInput) {
-        try { fileInput.setAttribute("accept", "image/png,image/jpeg,.png,.jpg,.jpeg"); } catch (_) {}
+        // Hộp chọn file: chỉ hiện PNG / JPG / JPEG (ẩn video & file khác)
+        try {
+            fileInput.setAttribute("accept", "image/png,image/jpeg,.png,.jpg,.jpeg");
+        } catch (_) {}
 
         fileInput.addEventListener("change", async (e) => {
             const file = e.target.files && e.target.files[0];
