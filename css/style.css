@@ -350,29 +350,29 @@ select.custom-select {
 #composerShell.is-multiline {
     height: auto;
     min-height: 40px;
-    max-height: min(160px, 35vh);
     align-items: flex-end;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-radius: 44px !important;
 }
 #messageInput {
     display: block;
     width: 100%;
-    height: 24px !important;
+    height: 24px;
     min-height: 24px;
-    max-height: 24px;
     line-height: 24px;
     padding: 0 !important;
     margin: 0;
     overflow-y: hidden;
     overflow-x: hidden;
     resize: none;
+    field-sizing: fixed;
     border: none;
     box-sizing: border-box;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 #composerShell.is-multiline #messageInput {
-    height: auto !important;
-    max-height: min(140px, 30vh) !important;
-    line-height: 1.4;
-    overflow-y: auto;
+    /* Height and overflow are set from JavaScript to fit the active viewport. */
 }
