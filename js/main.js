@@ -3183,6 +3183,91 @@ function getVerifiedBadge(isVerified) {
     }
 
     /* Upload ảnh chat → Supabase Storage bucket "chat-images" (public URL) */
+    const MAX_CHAT_IMAGE_BYTES = 100 * 1024 * 1024; // 100MB
+
+    function isAllowedChatImage(file) {
+        if (!file) return false;
+        const type = String(file.type || "").toLowerCase();
+        if (type === "image/jpeg" || type === "image/jpg" || type === "image/png") return true;
+        const name = String(file.name || "").toLowerCase();
+        return /\.(jpe?g|png)$/.test(name);
+    }
+
+    /** Nén ảnh (canvas) đến khi size < maxBytes; trả về File mới */
+    async function compressImageUnderLimit(file, maxBytes) {
+        if (!file || file.size <= maxBytes) return file;
+
+        const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error("read failed"));
+            reader.readAsDataURL(file);
+        });
+
+        const img = await new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error("image load failed"));
+            image.src = dataUrl;
+        });
+
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+        let quality = 0.92;
+        const preferPng = /png$/i.test(file.name || "") || file.type === "image/png";
+        // JPEG nén tốt hơn cho ảnh lớn; PNG giữ alpha nhưng khó <100MB → ưu tiên jpeg khi cần nén mạnh
+        let mime = preferPng && file.size < maxBytes * 2 ? "image/png" : "image/jpeg";
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        for (let attempt = 0; attempt < 12; attempt++) {
+            canvas.width = Math.max(1, Math.round(width));
+            canvas.height = Math.max(1, Math.round(height));
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            const blob = await new Promise((resolve) => {
+                if (mime === "image/png") {
+                    canvas.toBlob((b) => resolve(b), "image/png");
+                } else {
+                    canvas.toBlob((b) => resolve(b), "image/jpeg", quality);
+                }
+            });
+
+            if (!blob) break;
+            if (blob.size <= maxBytes) {
+                const base = (file.name || "image").replace(/\.[^.]+$/, "");
+                const ext = mime === "image/png" ? "png" : "jpg";
+                return new File([blob], base + "." + ext, { type: mime, lastModified: Date.now() });
+            }
+
+            // Vẫn quá lớn → giảm chất lượng / kích thước
+            if (mime === "image/png") {
+                mime = "image/jpeg";
+                quality = 0.85;
+            } else if (quality > 0.45) {
+                quality -= 0.12;
+            } else {
+                width *= 0.75;
+                height *= 0.75;
+                quality = Math.max(0.4, quality);
+            }
+        }
+
+        // Lần cuối bắt buộc jpeg quality thấp
+        canvas.width = Math.max(1, Math.round(width));
+        canvas.height = Math.max(1, Math.round(height));
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const lastBlob = await new Promise((resolve) => {
+            canvas.toBlob((b) => resolve(b), "image/jpeg", 0.4);
+        });
+        if (!lastBlob) throw new Error("compress failed");
+        const base = (file.name || "image").replace(/\.[^.]+$/, "");
+        return new File([lastBlob], base + ".jpg", { type: "image/jpeg", lastModified: Date.now() });
+    }
+
     async function uploadChatImage(file) {
         if (!window.supabaseClient || !file) return null;
         try {
@@ -3211,38 +3296,58 @@ function getVerifiedBadge(isVerified) {
     }
 
     if (fileInput) {
+        // Chỉ cho chọn ảnh PNG / JPG / JPEG
+        try { fileInput.setAttribute("accept", "image/png,image/jpeg,.png,.jpg,.jpeg"); } catch (_) {}
+
         fileInput.addEventListener("change", async (e) => {
             const file = e.target.files && e.target.files[0];
             if (!file) return;
 
             const chat = state.chats.find((c) => c.id === state.activeChatId);
-            if (!chat) return;
+            if (!chat) {
+                fileInput.value = "";
+                return;
+            }
 
-            if (file.type.startsWith("image/")) {
-                const imageUrl = await uploadChatImage(file);
-                if (imageUrl) {
-                    const msg = {
-                        id: uid("m"),
-                        senderId: "me",
-                        text: `[IMAGE]:${imageUrl}`,
-                        createdAt: Date.now(),
-                        status: "sending"
-                    };
-                    chat.messages.push(msg);
-                    postMessageToSupabase(msg, chat.id);
-                    renderMessages(chat);
-                    renderChatList();
-                } else {
-                    console.error("[ZChat] Image upload failed — no public URL");
+            if (!isAllowedChatImage(file)) {
+                alert("Chỉ được gửi ảnh PNG, JPG hoặc JPEG.");
+                fileInput.value = "";
+                return;
+            }
+
+            let toUpload = file;
+            try {
+                if (file.size > MAX_CHAT_IMAGE_BYTES) {
+                    toUpload = await compressImageUnderLimit(file, MAX_CHAT_IMAGE_BYTES);
+                    if (!toUpload || toUpload.size > MAX_CHAT_IMAGE_BYTES) {
+                        alert("Ảnh quá lớn. Không thể nén xuống dưới 100MB.");
+                        fileInput.value = "";
+                        return;
+                    }
                 }
-            } else {
-                const msg = { id: uid("m"), senderId: "me", text: "", attachment: file.name, createdAt: Date.now(), status: "delivered" };
+            } catch (err) {
+                console.error("[ZChat] compress image:", err);
+                alert("Không thể nén ảnh. Thử ảnh nhỏ hơn.");
+                fileInput.value = "";
+                return;
+            }
+
+            const imageUrl = await uploadChatImage(toUpload);
+            if (imageUrl) {
+                const msg = {
+                    id: uid("m"),
+                    senderId: "me",
+                    text: `[IMAGE]:${imageUrl}`,
+                    createdAt: Date.now(),
+                    status: "delivered"
+                };
                 chat.messages.push(msg);
                 postMessageToSupabase(msg, chat.id);
-                scheduleDisappearing(chat, msg);
-
                 renderMessages(chat);
                 renderChatList();
+            } else {
+                console.error("[ZChat] Image upload failed — no public URL");
+                alert("Upload ảnh thất bại. Thử lại.");
             }
 
             fileInput.value = "";
