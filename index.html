@@ -452,32 +452,32 @@
                         </button>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-end gap-2">
                         <button type="button" id="attachBtn" aria-label="Attach file"
-                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2 mb-0.5"
                                 style="background-color: color-mix(in srgb, var(--elevated2) 72%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--transparent-border); color: var(--muted);">
                             <i data-lucide="plus" class="w-[19px] h-[19px]"></i>
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
-                        <div class="flex flex-1 min-h-10 items-center gap-1.5 rounded-full pl-4 pr-1.5"
+                        <div id="composerShell" class="flex flex-1 min-h-10 items-end gap-1.5 rounded-[22px] pl-4 pr-1.5 py-1"
                              style="background-color: color-mix(in srgb, var(--elevated2) 72%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--transparent-border);">
                             <textarea
                                     id="messageInput"
                                     rows="1"
                                     placeholder="Message"
-                                    class="max-h-40 flex-1 resize-none bg-transparent py-2 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
+                                    class="flex-1 resize-none bg-transparent py-2 text-[14.5px] leading-relaxed focus:outline-none scrollbar-thin"
                                     style="color: var(--ink);"
                             ></textarea>
 
                             <button type="button" id="emojiBtn" aria-label="Emoji picker"
-                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2"
+                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-elevated2 mb-0.5"
                                     style="color: var(--muted);">
                                 <i data-lucide="smile" class="w-[19px] h-[19px]"></i>
                             </button>
 
                             <button type="button" id="sendBtn" aria-label="Send message" disabled
-                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90"
+                                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-30 enabled:hover:opacity-90 mb-0.5"
                                     style="background-color: #1b98e0; color: #ffffff;">
                                 <i id="sendIcon" data-lucide="arrow-up" class="w-[16px] h-[16px]"></i>
                             </button>
