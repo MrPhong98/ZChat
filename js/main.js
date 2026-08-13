@@ -3183,7 +3183,7 @@ function getVerifiedBadge(isVerified) {
     }
 
     /* Upload ảnh chat → Supabase Storage bucket "chat-images" (public URL) */
-    const MAX_CHAT_IMAGE_BYTES = 100 * 1024 * 1024; // 100MB
+    const MAX_CHAT_IMAGE_BYTES = 50 * 1024 * 1024; // 50MB — trên mức này sẽ nén
 
     function isAllowedChatImage(file) {
         if (!file) return false;
@@ -3193,7 +3193,6 @@ function getVerifiedBadge(isVerified) {
         return /\.(jpe?g|png)$/.test(name);
     }
 
-    /** Nén ảnh (canvas) đến khi size < maxBytes; trả về File mới */
     async function compressImageUnderLimit(file, maxBytes) {
         if (!file || file.size <= maxBytes) return file;
 
@@ -3215,7 +3214,6 @@ function getVerifiedBadge(isVerified) {
         let height = img.naturalHeight || img.height;
         let quality = 0.92;
         const preferPng = /png$/i.test(file.name || "") || file.type === "image/png";
-        // JPEG nén tốt hơn cho ảnh lớn; PNG giữ alpha nhưng khó <100MB → ưu tiên jpeg khi cần nén mạnh
         let mime = preferPng && file.size < maxBytes * 2 ? "image/png" : "image/jpeg";
 
         const canvas = document.createElement("canvas");
@@ -3242,7 +3240,6 @@ function getVerifiedBadge(isVerified) {
                 return new File([blob], base + "." + ext, { type: mime, lastModified: Date.now() });
             }
 
-            // Vẫn quá lớn → giảm chất lượng / kích thước
             if (mime === "image/png") {
                 mime = "image/jpeg";
                 quality = 0.85;
@@ -3255,7 +3252,6 @@ function getVerifiedBadge(isVerified) {
             }
         }
 
-        // Lần cuối bắt buộc jpeg quality thấp
         canvas.width = Math.max(1, Math.round(width));
         canvas.height = Math.max(1, Math.round(height));
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -3296,7 +3292,6 @@ function getVerifiedBadge(isVerified) {
     }
 
     if (fileInput) {
-        // Chỉ cho chọn ảnh PNG / JPG / JPEG
         try { fileInput.setAttribute("accept", "image/png,image/jpeg,.png,.jpg,.jpeg"); } catch (_) {}
 
         fileInput.addEventListener("change", async (e) => {
@@ -3320,7 +3315,7 @@ function getVerifiedBadge(isVerified) {
                 if (file.size > MAX_CHAT_IMAGE_BYTES) {
                     toUpload = await compressImageUnderLimit(file, MAX_CHAT_IMAGE_BYTES);
                     if (!toUpload || toUpload.size > MAX_CHAT_IMAGE_BYTES) {
-                        alert("Ảnh quá lớn. Không thể nén xuống dưới 100MB.");
+                        alert("Ảnh quá lớn. Không thể nén xuống dưới 50MB.");
                         fileInput.value = "";
                         return;
                     }
