@@ -949,7 +949,32 @@ function getVerifiedBadge(isVerified) {
         icons();
     }
 
+    /** Passcode: chưa unlock hoặc quá 50h → chuyển recovery.html */
+    function needsPasscodeGate() {
+        const TTL = 50 * 60 * 60 * 1000;
+        const unlockedAt = parseInt(localStorage.getItem("zchat_passcode_unlocked_at") || "0", 10) || 0;
+        if (!unlockedAt) return true;
+        return (Date.now() - unlockedAt) >= TTL;
+    }
+
+    function redirectToPasscode() {
+        // Tránh vòng lặp nếu đang ở recovery
+        if (/recovery\.html/i.test(location.pathname + location.href)) return false;
+        window.location.replace("recovery.html");
+        return true;
+    }
+
     function enterApp(username) {
+        if (username) {
+            localStorage.setItem("zchat_username", username);
+            currentUsername = username;
+        }
+        // Bắt nhập/tạo passcode (recovery.html + recovery.js + bảng public.passcode)
+        if (needsPasscodeGate()) {
+            redirectToPasscode();
+            return;
+        }
+
         if (window.ZChatE2EE && username) {
             window.ZChatE2EE.ensureUserKeys(username).catch((e) => console.error("[E2EE] enterApp:", e));
         }
@@ -1536,56 +1561,13 @@ function getVerifiedBadge(isVerified) {
         cancelReplyBtn.addEventListener("click", cancelReplyMode);
     }
 
-    // Cuộn tới tin được reply → khi tin đã vào khung nhìn mới lắc (không delay cố định)
+    // Cuộn tới + highlight tin nhắn gốc khi bấm vào khối trích dẫn reply
     function scrollToMessage(msgId) {
-        if (!msgId) return;
-        const el = document.getElementById("msg-" + msgId);
+        const el = document.getElementById(`msg-${msgId}`);
         if (!el) return;
-
-        const target = el.querySelector(".msg-bubble-pressable") || el.querySelector(".rounded-bubble") || el;
-        let done = false;
-
-        const playShake = () => {
-            if (done) return;
-            done = true;
-            target.classList.remove("msg-reply-shake");
-            void target.offsetWidth;
-            target.classList.add("msg-reply-shake");
-            const onEnd = () => {
-                target.classList.remove("msg-reply-shake");
-                target.removeEventListener("animationend", onEnd);
-            };
-            target.addEventListener("animationend", onEnd);
-        };
-
-        const root = (typeof messageFeed !== "undefined" && messageFeed) ? messageFeed : null;
-
-        if (typeof IntersectionObserver === "function") {
-            const obs = new IntersectionObserver(
-                (entries) => {
-                    for (const entry of entries) {
-                        if (!entry.isIntersecting) continue;
-                        // Đã thấy đủ trong viewport của feed → lắc
-                        if (entry.intersectionRatio >= 0.35) {
-                            obs.disconnect();
-                            // một nhịp ngắn để cuộn “dừng” hẳn
-                            requestAnimationFrame(() => requestAnimationFrame(playShake));
-                        }
-                    }
-                },
-                { root: root, threshold: [0.35, 0.5, 0.75, 1] }
-            );
-            obs.observe(el);
-            // fallback nếu đã ở sẵn trong màn hình / observer không kịp
-            setTimeout(() => {
-                try { obs.disconnect(); } catch (_) {}
-                playShake();
-            }, 4000);
-        } else {
-            setTimeout(playShake, 500);
-        }
-
         el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("msg-highlight-flash");
+        setTimeout(() => el.classList.remove("msg-highlight-flash"), 1200);
     }
 
     function showSimpleToast(message, iconName) {
