@@ -1500,8 +1500,13 @@ function getVerifiedBadge(isVerified) {
         if (!msg) return "";
         const { body } = parseReply(msg.text || "");
         if (body.startsWith("[IMAGE]:")) return "📷 Photo";
-        if (msg.attachment) return `📎 ${msg.attachment}`;
-        return body;
+        if (msg.attachment) {
+            const a = String(msg.attachment || "");
+            return a.length > 40 ? ("📎 " + a.slice(0, 40) + "…") : ("📎 " + a);
+        }
+        const t = String(body || "").replace(/\s+/g, " ").trim();
+        if (t.length <= 72) return t;
+        return t.slice(0, 72).trimEnd() + "…";
     }
 
     function startReplyMessage(msgId) {
@@ -1807,10 +1812,12 @@ function getVerifiedBadge(isVerified) {
                 }
             }
 
+            let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
+            if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
             const replyQuoteHtml = replyId
                 ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
                      <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
-                     <span class="text-[11px] truncate opacity-70" style="color: var(--ink);">${escapeHtml(replyPreview)}</span>
+                     <span class="text-[11px] opacity-70 msg-reply-preview" style="color: var(--ink);">${escapeHtml(shortReplyPrev)}</span>
                    </div>`
                 : "";
 
@@ -1842,7 +1849,7 @@ function getVerifiedBadge(isVerified) {
                     : "");
 
             wrap.innerHTML = `
-        <div class="relative flex max-w-[72%] flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
+        <div class="relative flex max-w-[72%] min-w-0 flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
           ${bubble}
