@@ -1536,17 +1536,18 @@ function getVerifiedBadge(isVerified) {
         cancelReplyBtn.addEventListener("click", cancelReplyMode);
     }
 
-    // Cuộn tới tin được reply → đợi 800ms → lắc trái–phải (không nền màu)
+    // Cuộn tới tin được reply → khi tin đã vào khung nhìn mới lắc (không delay cố định)
     function scrollToMessage(msgId) {
         if (!msgId) return;
         const el = document.getElementById("msg-" + msgId);
         if (!el) return;
 
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-
         const target = el.querySelector(".msg-bubble-pressable") || el.querySelector(".rounded-bubble") || el;
+        let done = false;
 
         const playShake = () => {
+            if (done) return;
+            done = true;
             target.classList.remove("msg-reply-shake");
             void target.offsetWidth;
             target.classList.add("msg-reply-shake");
@@ -1557,7 +1558,34 @@ function getVerifiedBadge(isVerified) {
             target.addEventListener("animationend", onEnd);
         };
 
-        setTimeout(playShake, 800);
+        const root = (typeof messageFeed !== "undefined" && messageFeed) ? messageFeed : null;
+
+        if (typeof IntersectionObserver === "function") {
+            const obs = new IntersectionObserver(
+                (entries) => {
+                    for (const entry of entries) {
+                        if (!entry.isIntersecting) continue;
+                        // Đã thấy đủ trong viewport của feed → lắc
+                        if (entry.intersectionRatio >= 0.35) {
+                            obs.disconnect();
+                            // một nhịp ngắn để cuộn “dừng” hẳn
+                            requestAnimationFrame(() => requestAnimationFrame(playShake));
+                        }
+                    }
+                },
+                { root: root, threshold: [0.35, 0.5, 0.75, 1] }
+            );
+            obs.observe(el);
+            // fallback nếu đã ở sẵn trong màn hình / observer không kịp
+            setTimeout(() => {
+                try { obs.disconnect(); } catch (_) {}
+                playShake();
+            }, 4000);
+        } else {
+            setTimeout(playShake, 500);
+        }
+
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     function showSimpleToast(message, iconName) {
