@@ -172,6 +172,38 @@ textarea { field-sizing: content; }
 .msg-action-item.danger { color: #ef4444; }
 .msg-action-item .msg-action-icon { width: 15px; height: 15px; opacity: .75; flex-shrink: 0; }
 
+/* Label reply compact (mũi tên + tên) — phía trên bubble, giống iMessage */
+.msg-reply-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 0 4px 2px;
+    margin: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    opacity: 0.9;
+}
+.msg-reply-label:hover { opacity: 1; }
+.msg-reply-label-icon {
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+.msg-reply-label-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
+}
+
+/* Giữ class cũ nếu còn tin nhắn legacy */
 .msg-reply-quote {
     border-left: 3px solid var(--transparent-border);
     background-color: rgba(127,127,127,0.12);
@@ -184,33 +216,26 @@ textarea { field-sizing: content; }
     overflow: hidden;
 }
 .msg-reply-quote:hover { background-color: rgba(127,127,127,0.2); }
-.msg-reply-quote .msg-reply-preview {
-    display: block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Bubble tin dài: xuống dòng, không mất chữ / không tràn ngang */
-#messageFeed .msg-bubble-pressable {
-    max-width: 100%;
-    min-width: 0;
-}
-#messageFeed .rounded-bubble {
-    max-width: 100%;
-    min-width: 0;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    white-space: pre-wrap;
-}
 
 .msg-highlight-flash {
-    animation: msg-highlight-flash 1.1s ease;
+    animation: msg-highlight-flash 0.9s ease;
 }
 @keyframes msg-highlight-flash {
-    0% { background-color: rgba(16,185,129,0.25); }
+    0% { background-color: rgba(27, 152, 224, 0.22); }
     100% { background-color: transparent; }
+}
+
+/* Rung nhẹ khi nhảy tới tin được reply */
+.msg-reply-shake {
+    animation: msg-reply-shake 0.55s ease;
+}
+@keyframes msg-reply-shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-3px); }
+    30% { transform: translateX(3px); }
+    45% { transform: translateX(-2px); }
+    60% { transform: translateX(2px); }
+    75% { transform: translateX(-1px); }
 }
 
 /*profile.html*/
@@ -398,4 +423,16 @@ select.custom-select {
 }
 #composerShell.is-multiline #messageInput {
     /* Height and overflow are set from JavaScript to fit the active viewport. */
+}
+
+#messageFeed .msg-bubble-pressable {
+    max-width: 100%;
+    min-width: 0;
+}
+#messageFeed .rounded-bubble {
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
 }
