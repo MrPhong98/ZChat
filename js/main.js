@@ -1500,8 +1500,13 @@ function getVerifiedBadge(isVerified) {
         if (!msg) return "";
         const { body } = parseReply(msg.text || "");
         if (body.startsWith("[IMAGE]:")) return "📷 Photo";
-        if (msg.attachment) return `📎 ${msg.attachment}`;
-        return body;
+        if (msg.attachment) {
+            const a = String(msg.attachment || "");
+            return a.length > 40 ? ("📎 " + a.slice(0, 40) + "…") : ("📎 " + a);
+        }
+        const t = String(body || "").replace(/\s+/g, " ").trim();
+        if (t.length <= 72) return t;
+        return t.slice(0, 72).trimEnd() + "…";
     }
 
     function startReplyMessage(msgId) {
@@ -1533,16 +1538,11 @@ function getVerifiedBadge(isVerified) {
 
     // Cuộn tới + highlight tin nhắn gốc khi bấm vào khối trích dẫn reply
     function scrollToMessage(msgId) {
-        const el = document.getElementById("msg-" + msgId);
+        const el = document.getElementById(`msg-${msgId}`);
         if (!el) return;
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.remove("msg-highlight-flash", "msg-reply-shake");
-        // force reflow so animation restarts
-        void el.offsetWidth;
-        el.classList.add("msg-highlight-flash", "msg-reply-shake");
-        setTimeout(() => {
-            el.classList.remove("msg-highlight-flash", "msg-reply-shake");
-        }, 900);
+        el.classList.add("msg-highlight-flash");
+        setTimeout(() => el.classList.remove("msg-highlight-flash"), 1200);
     }
 
     function showSimpleToast(message, iconName) {
@@ -1812,12 +1812,13 @@ function getVerifiedBadge(isVerified) {
                 }
             }
 
-            // Label reply kiểu compact (mũi tên + tên) — nằm NGOÀI / PHÍA TRÊN bubble
-            const replyLabelHtml = replyId
-                ? `<button type="button" class="msg-reply-label" data-reply-target="${replyId}" title="Go to message">
-                     <i data-lucide="corner-up-left" class="msg-reply-label-icon"></i>
-                     <span class="msg-reply-label-name">${escapeHtml(replySender || "Message")}</span>
-                   </button>`
+            let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
+            if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
+            const replyQuoteHtml = replyId
+                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
+                     <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
+                     <span class="text-[11px] opacity-70 msg-reply-preview" style="color: var(--ink);">${escapeHtml(shortReplyPrev)}</span>
+                   </div>`
                 : "";
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
@@ -1827,12 +1828,10 @@ function getVerifiedBadge(isVerified) {
                 </button>`;
 
             const bubbleInner = isImageMsg
-                ? `${contentHtml}`
-                : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${contentHtml}</div>`;
+                ? `${replyQuoteHtml}${contentHtml}`
+                : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
 
-            const bubble = body
-                ? `<div class="msg-bubble-pressable">${bubbleInner}</div>`
-                : "";
+            const bubble = body ? `<div class="msg-bubble-pressable">${bubbleInner}</div>` : "";
 
             const disappearingOn = chat.disappearingTime && chat.disappearingTime !== "off";
             const timerIcon = disappearingOn
@@ -1850,10 +1849,9 @@ function getVerifiedBadge(isVerified) {
                     : "");
 
             wrap.innerHTML = `
-        <div class="relative flex max-w-[72%] min-w-0 flex-col gap-0.5 ${isMine ? "items-end" : "items-start"}">
+        <div class="relative flex max-w-[72%] min-w-0 flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
-          ${replyLabelHtml}
           ${bubble}
           ${meta}
         </div>`;
@@ -1877,7 +1875,7 @@ function getVerifiedBadge(isVerified) {
                 imgEl.addEventListener("click", () => openImageLightbox(imgEl.dataset.fullSrc));
             }
 
-            const quoteEl = wrap.querySelector(".msg-reply-label, .msg-reply-quote");
+            const quoteEl = wrap.querySelector(".msg-reply-quote");
             if (quoteEl) {
                 quoteEl.addEventListener("click", (e) => {
                     e.stopPropagation();
