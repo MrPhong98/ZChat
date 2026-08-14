@@ -1536,18 +1536,30 @@ function getVerifiedBadge(isVerified) {
         cancelReplyBtn.addEventListener("click", cancelReplyMode);
     }
 
-    // Cuộn tới tin được reply, xong mới lắc trái–phải (không nền xanh)
+    // Cuộn tới tin được reply → xong mới lắc trái–phải (không nền màu)
     function scrollToMessage(msgId) {
+        if (!msgId) return;
         const el = document.getElementById("msg-" + msgId);
         if (!el) return;
+
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        // Đợi cuộn xong rồi mới lắc
-        setTimeout(() => {
-            el.classList.remove("msg-reply-shake");
-            void el.offsetWidth;
-            el.classList.add("msg-reply-shake");
-            setTimeout(() => el.classList.remove("msg-reply-shake"), 650);
-        }, 380);
+
+        const target = el.querySelector(".msg-bubble-pressable") || el.querySelector(".rounded-bubble") || el;
+
+        const playShake = () => {
+            target.classList.remove("msg-reply-shake");
+            // reflow để animation chạy lại
+            void target.offsetWidth;
+            target.classList.add("msg-reply-shake");
+            const onEnd = () => {
+                target.classList.remove("msg-reply-shake");
+                target.removeEventListener("animationend", onEnd);
+            };
+            target.addEventListener("animationend", onEnd);
+        };
+
+        // Đợi cuộn mượt xong rồi mới lắc
+        setTimeout(playShake, 450);
     }
 
     function showSimpleToast(message, iconName) {
