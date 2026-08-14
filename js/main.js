@@ -1536,15 +1536,18 @@ function getVerifiedBadge(isVerified) {
         cancelReplyBtn.addEventListener("click", cancelReplyMode);
     }
 
-    // Cuộn tới tin nhắn gốc + lắc lư nhẹ (không highlight màu)
+    // Cuộn tới tin được reply, xong mới lắc trái–phải (không nền xanh)
     function scrollToMessage(msgId) {
         const el = document.getElementById("msg-" + msgId);
         if (!el) return;
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.classList.remove("msg-reply-shake");
-        void el.offsetWidth;
-        el.classList.add("msg-reply-shake");
-        setTimeout(() => el.classList.remove("msg-reply-shake"), 600);
+        // Đợi cuộn xong rồi mới lắc
+        setTimeout(() => {
+            el.classList.remove("msg-reply-shake");
+            void el.offsetWidth;
+            el.classList.add("msg-reply-shake");
+            setTimeout(() => el.classList.remove("msg-reply-shake"), 650);
+        }, 380);
     }
 
     function showSimpleToast(message, iconName) {
