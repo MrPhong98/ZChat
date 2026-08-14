@@ -143,6 +143,22 @@ textarea { field-sizing: content; }
 
 /* ============ MESSAGE ACTION MENU (3 chấm / long-press) ============ */
 .msg-bubble-pressable { transition: transform .12s ease, opacity .12s ease; }
+
+/* Lắc bubble sau khi lướt tới tin được reply */
+.msg-reply-shake {
+    animation: msg-reply-shake 0.55s ease both !important;
+}
+@keyframes msg-reply-shake {
+    0%, 100% { transform: translateX(0); }
+    12% { transform: translateX(-8px); }
+    24% { transform: translateX(8px); }
+    36% { transform: translateX(-6px); }
+    48% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    72% { transform: translateX(3px); }
+    84% { transform: translateX(-2px); }
+}
+
 .msg-bubble-pressable.is-pressing { transform: scale(0.97); opacity: 0.85; }
 
 .msg-action-menu {
@@ -205,18 +221,6 @@ textarea { field-sizing: content; }
     white-space: pre-wrap;
 }
 
-/* Sau khi lướt tới tin reply → lắc trái phải */
-#messageFeed .msg-reply-shake {
-    animation: msg-reply-shake 0.6s ease;
-}
-@keyframes msg-reply-shake {
-    0%, 100% { transform: translateX(0); }
-    15% { transform: translateX(-6px); }
-    30% { transform: translateX(6px); }
-    45% { transform: translateX(-5px); }
-    60% { transform: translateX(4px); }
-    75% { transform: translateX(-2px); }
-}
 
 /*profile.html*/
 html, body { height: 100%; }
