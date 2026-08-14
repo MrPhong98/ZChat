@@ -144,7 +144,7 @@ textarea { field-sizing: content; }
 /* ============ MESSAGE ACTION MENU (3 chấm / long-press) ============ */
 .msg-bubble-pressable { transition: transform .12s ease, opacity .12s ease; }
 
-/* Lắc bubble sau khi lướt tới tin được reply */
+/* Lắc bubble sau khi lướt tới tin được reply (delay 800ms ở JS) */
 .msg-reply-shake {
     animation: msg-reply-shake 0.55s ease both !important;
 }
