@@ -1509,6 +1509,19 @@ function getVerifiedBadge(isVerified) {
         return t.slice(0, 72).trimEnd() + "…";
     }
 
+    /** URL ảnh của tin được reply (nếu có) — dùng để hiện thumbnail */
+    function resolveReplyImageUrl(replyId, chat) {
+        if (!replyId || !chat || !Array.isArray(chat.messages)) return null;
+        const orig = chat.messages.find((m) => String(m.id) === String(replyId));
+        if (!orig) return null;
+        const { body } = parseReply(orig.text || "");
+        if (body && body.startsWith("[IMAGE]:")) {
+            const url = body.replace("[IMAGE]:", "").trim();
+            return url || null;
+        }
+        return null;
+    }
+
     function startReplyMessage(msgId) {
         cancelEditMode();
         const chat = state.chats.find((c) => c.id === state.activeChatId);
@@ -1814,12 +1827,23 @@ function getVerifiedBadge(isVerified) {
 
             let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
             if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
-            const replyQuoteHtml = replyId
-                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
+
+            // Reply ảnh → thumbnail nhỏ phía trên; reply chữ → quote text như cũ
+            const replyImgUrl = replyId ? resolveReplyImageUrl(replyId, chat) : null;
+            let replyQuoteHtml = "";
+            let replyThumbHtml = "";
+            if (replyId) {
+                if (replyImgUrl) {
+                    replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image mb-1" data-reply-target="${escapeHtml(String(replyId))}">
+                        <img src="${escapeHtml(replyImgUrl)}" class="msg-reply-thumb" alt="Photo" loading="lazy" />
+                    </div>`;
+                } else {
+                    replyQuoteHtml = `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${escapeHtml(String(replyId))}">
                      <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
                      <span class="text-[11px] opacity-70 msg-reply-preview" style="color: var(--ink);">${escapeHtml(shortReplyPrev)}</span>
-                   </div>`
-                : "";
+                   </div>`;
+                }
+            }
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
             const menuBtnHtml = `
@@ -1828,8 +1852,8 @@ function getVerifiedBadge(isVerified) {
                 </button>`;
 
             const bubbleInner = isImageMsg
-                ? `${replyQuoteHtml}${contentHtml}`
-                : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
+                ? `${replyThumbHtml}${replyQuoteHtml}${contentHtml}`
+                : `${replyThumbHtml}<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
 
             const bubble = body ? `<div class="msg-bubble-pressable">${bubbleInner}</div>` : "";
 
@@ -3223,7 +3247,7 @@ function getVerifiedBadge(isVerified) {
     }
 
     /* Upload ảnh chat → Supabase Storage bucket "chat-images" (public URL) */
-    const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024; // >10MB → nén
+    const MAX_CHAT_IMAGE_BYTES = 50 * 1024 * 1024; // >50MB → nén
 
     function isAllowedChatImage(file) {
         if (!file) return false;
@@ -3338,7 +3362,7 @@ function getVerifiedBadge(isVerified) {
                 if (file.size > MAX_CHAT_IMAGE_BYTES) {
                     toUpload = await compressImageUnderLimit(file, MAX_CHAT_IMAGE_BYTES);
                     if (!toUpload || toUpload.size > MAX_CHAT_IMAGE_BYTES) {
-                        alert("Ảnh quá lớn. Không thể nén xuống dưới 10MB.");
+                        alert("Ảnh quá lớn. Không thể nén xuống dưới 50MB.");
                         fileInput.value = "";
                         return;
                     }
