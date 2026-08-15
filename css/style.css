@@ -401,22 +401,24 @@ select.custom-select {
 }
 
 
-/* Reply ảnh: thumbnail nhỏ phía trên bong bóng */
+/* Reply ảnh: thumbnail nhỏ hơn bong bóng chat */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
-    max-width: 140px;
+    max-width: 72px;
     cursor: pointer;
+    opacity: 0.92;
 }
 .msg-reply-thumb {
     display: block;
-    width: 120px;
-    max-width: 42vw;
-    height: 88px;
+    width: 64px;
+    height: 64px;
+    max-width: 22vw;
+    max-height: 64px;
     object-fit: cover;
-    border-radius: 16px;
-    border: 1px solid var(--transparent-border, rgba(255,255,255,0.08));
+    border-radius: 12px;
+    border: 1px solid rgba(127,127,127,0.35);
 }
 #messageFeed .justify-end .msg-reply-quote--image {
     margin-left: auto;
