@@ -1509,6 +1509,18 @@ function getVerifiedBadge(isVerified) {
         return t.slice(0, 72).trimEnd() + "…";
     }
 
+    function resolveReplyImageUrl(replyId, chat) {
+        if (!replyId || !chat || !Array.isArray(chat.messages)) return null;
+        const orig = chat.messages.find((m) => String(m.id) === String(replyId));
+        if (!orig) return null;
+        const { body } = parseReply(orig.text || "");
+        if (body && body.startsWith("[IMAGE]:")) {
+            const url = body.replace("[IMAGE]:", "").trim();
+            return url || null;
+        }
+        return null;
+    }
+
     function startReplyMessage(msgId) {
         cancelEditMode();
         const chat = state.chats.find((c) => c.id === state.activeChatId);
@@ -1780,10 +1792,7 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            // Tin reply (đặc biệt reply ảnh) cách tin phía trên một chút
-            const earlyReply = parseReply(msg.text || "");
-            const replyGap = earlyReply.replyId ? "mt-2.5 " : "";
-            wrap.className = replyGap + (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
+            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
@@ -1817,12 +1826,27 @@ function getVerifiedBadge(isVerified) {
 
             let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
             if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
-            const replyQuoteHtml = replyId
-                ? `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${replyId}">
+
+            const replyImgUrl = replyId ? resolveReplyImageUrl(replyId, chat) : null;
+            const replyNameLabel = (replySender || "").trim() || "User";
+            let replyQuoteHtml = "";
+            let replyThumbHtml = "";
+            if (replyId) {
+                if (replyImgUrl) {
+                    replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image" data-reply-target="${escapeHtml(String(replyId))}">
+                        <div class="msg-reply-image-head">
+                            <span class="msg-reply-image-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg></span>
+                            <span class="msg-reply-image-name">${escapeHtml(replyNameLabel)}</span>
+                        </div>
+                        <img src="${escapeHtml(replyImgUrl)}" class="msg-reply-thumb" alt="Photo" loading="lazy" />
+                    </div>`;
+                } else {
+                    replyQuoteHtml = `<div class="msg-reply-quote flex flex-col gap-0.5 mb-1" data-reply-target="${escapeHtml(String(replyId))}">
                      <span class="text-[11px] font-semibold" style="color: var(--ink); opacity: .85;">${escapeHtml(replySender)}</span>
                      <span class="text-[11px] opacity-70 msg-reply-preview" style="color: var(--ink);">${escapeHtml(shortReplyPrev)}</span>
-                   </div>`
-                : "";
+                   </div>`;
+                }
+            }
 
             // Nút menu 3 chấm — luôn hiện (mờ), rõ hơn khi hover / touch
             const menuBtnHtml = `
@@ -1855,6 +1879,7 @@ function getVerifiedBadge(isVerified) {
         <div class="relative flex max-w-[72%] min-w-0 flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
+          ${replyThumbHtml}
           ${bubble}
           ${meta}
         </div>`;
