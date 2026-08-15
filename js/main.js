@@ -1776,6 +1776,12 @@ function getVerifiedBadge(isVerified) {
             return;
         }
 
+        // Seen chỉ hiện dưới tin nhắn cuối cùng của mình
+        let lastMineIdx = -1;
+        for (let k = msgs.length - 1; k >= 0; k--) {
+            if (msgs[k].senderId === "me") { lastMineIdx = k; break; }
+        }
+
         msgs.forEach((msg, i) => {
             const prev = msgs[i - 1];
             const next = msgs[i + 1];
@@ -1792,8 +1798,7 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            const _isReplyMsg = !!(msg.text && String(msg.text).indexOf("[REPLY:") === 0);
-            wrap.className = (_isReplyMsg ? "mt-3 " : "") + (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
+            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
@@ -1866,7 +1871,8 @@ function getVerifiedBadge(isVerified) {
                 ? `<i data-lucide="timer" class="w-[11px] h-[11px] shrink-0" style="color: var(--faint); opacity: 0.85;" title="Disappearing message"></i>`
                 : "";
 
-            const seenHtml = isMine ? statusIconMarkup(msg.status) : "";
+            // Chỉ tin cuối mình gửi mới hiện Seen
+            const seenHtml = (isMine && i === lastMineIdx) ? statusIconMarkup(msg.status) : "";
             const metaInner = `${timerIcon}${seenHtml}`;
             const hasMetaContent = !!timerIcon || !!seenHtml;
 
