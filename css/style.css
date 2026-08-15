@@ -400,23 +400,22 @@ select.custom-select {
     /* Height and overflow are set from JavaScript to fit the active viewport. */
 }
 
-
-/* Reply ảnh: thumbnail nhỏ hơn bong bóng chat */
+/* Reply ảnh: thu nhỏ theo tỷ lệ, không crop */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
-    max-width: 72px;
+    max-width: 120px;
     cursor: pointer;
-    opacity: 0.92;
+    opacity: 0.95;
 }
 .msg-reply-thumb {
     display: block;
-    width: 64px;
-    height: 64px;
-    max-width: 22vw;
-    max-height: 64px;
-    object-fit: cover;
+    width: auto;
+    height: auto;
+    max-width: 100px;
+    max-height: 100px;
+    object-fit: contain;
     border-radius: 12px;
     border: 1px solid rgba(127,127,127,0.35);
 }
