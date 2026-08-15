@@ -401,60 +401,10 @@ select.custom-select {
 }
 
 
-/* Reply ảnh: icon cong + tên + ảnh nhỏ */
-.msg-reply-quote--image {
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    border-left: none !important;
-    width: fit-content;
-    max-width: 96px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-.msg-reply-image-head {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 96px;
-    min-width: 0;
-}
-.msg-reply-image-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--muted);
-    flex-shrink: 0;
-}
-.msg-reply-image-icon svg {
-    display: block;
-    width: 12px;
-    height: 12px;
-}
+/* Reply ảnh — tên user chữ mỏng */
 .msg-reply-image-name {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 400 !important;
     line-height: 1.2;
     color: var(--muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
-.msg-reply-thumb {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: 80px;
-    max-height: 80px;
-    object-fit: contain;
-    border-radius: 12px;
-    border: 1px solid rgba(127,127,127,0.35);
-}
-#messageFeed .msg-bubble-pressable,
-#messageFeed .rounded-bubble {
-    width: fit-content;
-    max-width: 100%;
 }
