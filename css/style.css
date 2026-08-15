@@ -401,7 +401,7 @@ select.custom-select {
 }
 
 
-/* Reply ảnh: icon + tên nhỏ phía trên, ảnh thu nhỏ giữ tỷ lệ */
+/* Reply ảnh: mũi tên trái + tên nhỏ + ảnh thu nhỏ */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
@@ -417,15 +417,21 @@ select.custom-select {
 .msg-reply-image-head {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     max-width: 96px;
     min-width: 0;
 }
 .msg-reply-image-icon {
-    font-size: 10px;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--muted);
     flex-shrink: 0;
+}
+.msg-reply-image-icon svg {
+    display: block;
+    width: 12px;
+    height: 12px;
 }
 .msg-reply-image-name {
     font-size: 10px;
