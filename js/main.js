@@ -1509,7 +1509,7 @@ function getVerifiedBadge(isVerified) {
         return t.slice(0, 72).trimEnd() + "…";
     }
 
-    /** URL ảnh của tin được reply (nếu có) — dùng để hiện thumbnail */
+    /** URL ảnh của tin được reply (nếu có) */
     function resolveReplyImageUrl(replyId, chat) {
         if (!replyId || !chat || !Array.isArray(chat.messages)) return null;
         const orig = chat.messages.find((m) => String(m.id) === String(replyId));
@@ -1828,7 +1828,7 @@ function getVerifiedBadge(isVerified) {
             let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
             if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
 
-            // Reply ảnh → thumbnail nhỏ phía trên; reply chữ → quote text như cũ
+            // Reply ảnh → thumbnail nhỏ (nhỏ hơn bubble) phía trên; reply chữ → quote text
             const replyImgUrl = replyId ? resolveReplyImageUrl(replyId, chat) : null;
             let replyQuoteHtml = "";
             let replyThumbHtml = "";
