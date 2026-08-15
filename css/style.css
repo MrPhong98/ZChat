@@ -143,22 +143,6 @@ textarea { field-sizing: content; }
 
 /* ============ MESSAGE ACTION MENU (3 chấm / long-press) ============ */
 .msg-bubble-pressable { transition: transform .12s ease, opacity .12s ease; }
-
-/* Lắc bubble sau khi lướt tới tin được reply (delay 800ms ở JS) */
-.msg-reply-shake {
-    animation: msg-reply-shake 0.55s ease both !important;
-}
-@keyframes msg-reply-shake {
-    0%, 100% { transform: translateX(0); }
-    12% { transform: translateX(-8px); }
-    24% { transform: translateX(8px); }
-    36% { transform: translateX(-6px); }
-    48% { transform: translateX(6px); }
-    60% { transform: translateX(-4px); }
-    72% { transform: translateX(3px); }
-    84% { transform: translateX(-2px); }
-}
-
 .msg-bubble-pressable.is-pressing { transform: scale(0.97); opacity: 0.85; }
 
 .msg-action-menu {
@@ -221,6 +205,13 @@ textarea { field-sizing: content; }
     white-space: pre-wrap;
 }
 
+.msg-highlight-flash {
+    animation: msg-highlight-flash 1.1s ease;
+}
+@keyframes msg-highlight-flash {
+    0% { background-color: rgba(16,185,129,0.25); }
+    100% { background-color: transparent; }
+}
 
 /*profile.html*/
 html, body { height: 100%; }
@@ -407,4 +398,29 @@ select.custom-select {
 }
 #composerShell.is-multiline #messageInput {
     /* Height and overflow are set from JavaScript to fit the active viewport. */
+}
+
+
+/* Reply ảnh: thumbnail nhỏ phía trên bong bóng */
+.msg-reply-quote--image {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    max-width: 140px;
+    cursor: pointer;
+}
+.msg-reply-thumb {
+    display: block;
+    width: 120px;
+    max-width: 42vw;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 16px;
+    border: 1px solid var(--transparent-border, rgba(255,255,255,0.08));
+}
+#messageFeed .justify-end .msg-reply-quote--image {
+    margin-left: auto;
+}
+#messageFeed .justify-start .msg-reply-quote--image {
+    margin-right: auto;
 }
