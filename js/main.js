@@ -949,32 +949,7 @@ function getVerifiedBadge(isVerified) {
         icons();
     }
 
-    /** Passcode: chưa unlock hoặc quá 50h → chuyển recovery.html */
-    function needsPasscodeGate() {
-        const TTL = 50 * 60 * 60 * 1000;
-        const unlockedAt = parseInt(localStorage.getItem("zchat_passcode_unlocked_at") || "0", 10) || 0;
-        if (!unlockedAt) return true;
-        return (Date.now() - unlockedAt) >= TTL;
-    }
-
-    function redirectToPasscode() {
-        // Tránh vòng lặp nếu đang ở recovery
-        if (/recovery\.html/i.test(location.pathname + location.href)) return false;
-        window.location.replace("recovery.html");
-        return true;
-    }
-
     function enterApp(username) {
-        if (username) {
-            localStorage.setItem("zchat_username", username);
-            currentUsername = username;
-        }
-        // Bắt nhập/tạo passcode (recovery.html + recovery.js + bảng public.passcode)
-        if (needsPasscodeGate()) {
-            redirectToPasscode();
-            return;
-        }
-
         if (window.ZChatE2EE && username) {
             window.ZChatE2EE.ensureUserKeys(username).catch((e) => console.error("[E2EE] enterApp:", e));
         }
@@ -3248,7 +3223,7 @@ function getVerifiedBadge(isVerified) {
     }
 
     /* Upload ảnh chat → Supabase Storage bucket "chat-images" (public URL) */
-    const MAX_CHAT_IMAGE_BYTES = 50 * 1024 * 1024; // >50MB → nén
+    const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024; // >10MB → nén
 
     function isAllowedChatImage(file) {
         if (!file) return false;
@@ -3363,7 +3338,7 @@ function getVerifiedBadge(isVerified) {
                 if (file.size > MAX_CHAT_IMAGE_BYTES) {
                     toUpload = await compressImageUnderLimit(file, MAX_CHAT_IMAGE_BYTES);
                     if (!toUpload || toUpload.size > MAX_CHAT_IMAGE_BYTES) {
-                        alert("Ảnh quá lớn. Không thể nén xuống dưới 50MB.");
+                        alert("Ảnh quá lớn. Không thể nén xuống dưới 10MB.");
                         fileInput.value = "";
                         return;
                     }
