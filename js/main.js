@@ -1509,7 +1509,6 @@ function getVerifiedBadge(isVerified) {
         return t.slice(0, 72).trimEnd() + "…";
     }
 
-    /** URL ảnh của tin được reply (nếu có) */
     function resolveReplyImageUrl(replyId, chat) {
         if (!replyId || !chat || !Array.isArray(chat.messages)) return null;
         const orig = chat.messages.find((m) => String(m.id) === String(replyId));
@@ -1828,13 +1827,13 @@ function getVerifiedBadge(isVerified) {
             let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
             if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
 
-            // Reply ảnh → thumbnail nhỏ (nhỏ hơn bubble) phía trên; reply chữ → quote text
+            // Reply ảnh → thumbnail nhỏ NGOÀI bubble (không kéo giãn bubble)
             const replyImgUrl = replyId ? resolveReplyImageUrl(replyId, chat) : null;
             let replyQuoteHtml = "";
             let replyThumbHtml = "";
             if (replyId) {
                 if (replyImgUrl) {
-                    replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image mb-1" data-reply-target="${escapeHtml(String(replyId))}">
+                    replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image" data-reply-target="${escapeHtml(String(replyId))}">
                         <img src="${escapeHtml(replyImgUrl)}" class="msg-reply-thumb" alt="Photo" loading="lazy" />
                     </div>`;
                 } else {
@@ -1852,8 +1851,8 @@ function getVerifiedBadge(isVerified) {
                 </button>`;
 
             const bubbleInner = isImageMsg
-                ? `${replyThumbHtml}${replyQuoteHtml}${contentHtml}`
-                : `${replyThumbHtml}<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
+                ? `${replyQuoteHtml}${contentHtml}`
+                : `<div class="rounded-bubble px-4 py-2.5 text-[14.5px] leading-relaxed font-medium ${showTail ? (isMine ? "rounded-br-md" : "rounded-bl-md") : ""}" style="${bubbleStyle}">${replyQuoteHtml}${contentHtml}</div>`;
 
             const bubble = body ? `<div class="msg-bubble-pressable">${bubbleInner}</div>` : "";
 
@@ -1876,6 +1875,7 @@ function getVerifiedBadge(isVerified) {
         <div class="relative flex max-w-[72%] min-w-0 flex-col gap-1.5 ${isMine ? "items-end" : "items-start"}">
           ${menuBtnHtml}
           ${attachmentHtml}
+          ${replyThumbHtml}
           ${bubble}
           ${meta}
         </div>`;
