@@ -400,28 +400,32 @@ select.custom-select {
     /* Height and overflow are set from JavaScript to fit the active viewport. */
 }
 
-/* Reply ảnh: thu nhỏ theo tỷ lệ, không crop */
+
+/* Reply ảnh: nhỏ, giữ tỷ lệ, không kéo giãn bubble */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
-    max-width: 120px;
+    width: fit-content;
+    max-width: 88px;
     cursor: pointer;
-    opacity: 0.95;
+    flex-shrink: 0;
 }
 .msg-reply-thumb {
     display: block;
     width: auto;
     height: auto;
-    max-width: 100px;
-    max-height: 100px;
+    max-width: 80px;
+    max-height: 80px;
     object-fit: contain;
     border-radius: 12px;
     border: 1px solid rgba(127,127,127,0.35);
 }
-#messageFeed .justify-end .msg-reply-quote--image {
-    margin-left: auto;
+#messageFeed .msg-bubble-pressable {
+    width: fit-content;
+    max-width: 100%;
 }
-#messageFeed .justify-start .msg-reply-quote--image {
-    margin-right: auto;
+#messageFeed .rounded-bubble {
+    width: fit-content;
+    max-width: 100%;
 }
