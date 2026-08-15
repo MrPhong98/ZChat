@@ -1827,13 +1827,18 @@ function getVerifiedBadge(isVerified) {
             let shortReplyPrev = String(replyPreview || "").replace(/\s+/g, " ").trim();
             if (shortReplyPrev.length > 72) shortReplyPrev = shortReplyPrev.slice(0, 72).trimEnd() + "…";
 
-            // Reply ảnh → thumbnail nhỏ NGOÀI bubble (không kéo giãn bubble)
             const replyImgUrl = replyId ? resolveReplyImageUrl(replyId, chat) : null;
+            const replyNameLabel = (replySender || "").trim() || "User";
             let replyQuoteHtml = "";
             let replyThumbHtml = "";
             if (replyId) {
                 if (replyImgUrl) {
+                    // Icon reply + tên (chữ nhỏ) phía trên ảnh thu nhỏ
                     replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image" data-reply-target="${escapeHtml(String(replyId))}">
+                        <div class="msg-reply-image-head">
+                            <span class="msg-reply-image-icon" aria-hidden="true">↩</span>
+                            <span class="msg-reply-image-name">${escapeHtml(replyNameLabel)}</span>
+                        </div>
                         <img src="${escapeHtml(replyImgUrl)}" class="msg-reply-thumb" alt="Photo" loading="lazy" />
                     </div>`;
                 } else {
