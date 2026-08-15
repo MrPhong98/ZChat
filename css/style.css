@@ -401,15 +401,41 @@ select.custom-select {
 }
 
 
-/* Reply ảnh: nhỏ, giữ tỷ lệ, không kéo giãn bubble */
+/* Reply ảnh: icon + tên nhỏ phía trên, ảnh thu nhỏ giữ tỷ lệ */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
+    border-left: none !important;
     width: fit-content;
-    max-width: 88px;
+    max-width: 96px;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.msg-reply-image-head {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    max-width: 96px;
+    min-width: 0;
+}
+.msg-reply-image-icon {
+    font-size: 10px;
+    line-height: 1;
+    color: var(--muted);
     flex-shrink: 0;
+}
+.msg-reply-image-name {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 .msg-reply-thumb {
     display: block;
@@ -421,10 +447,7 @@ select.custom-select {
     border-radius: 12px;
     border: 1px solid rgba(127,127,127,0.35);
 }
-#messageFeed .msg-bubble-pressable {
-    width: fit-content;
-    max-width: 100%;
-}
+#messageFeed .msg-bubble-pressable,
 #messageFeed .rounded-bubble {
     width: fit-content;
     max-width: 100%;
