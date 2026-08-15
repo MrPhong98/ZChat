@@ -1792,7 +1792,8 @@ function getVerifiedBadge(isVerified) {
 
             const wrap = document.createElement("div");
             wrap.id = `msg-${msg.id}`;
-            wrap.className = (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
+            const _isReplyMsg = !!(msg.text && String(msg.text).indexOf("[REPLY:") === 0);
+            wrap.className = (_isReplyMsg ? "mt-3 " : "") + (showTail ? "mb-3 " : "mb-1 ") + "group relative flex w-full " + (isMine ? "justify-end" : "justify-start");
 
             let attachmentHtml = "";
             if (msg.attachment) {
