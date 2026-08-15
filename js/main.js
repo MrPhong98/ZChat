@@ -1833,10 +1833,9 @@ function getVerifiedBadge(isVerified) {
             let replyThumbHtml = "";
             if (replyId) {
                 if (replyImgUrl) {
-                    // Icon reply + tên (chữ nhỏ) phía trên ảnh thu nhỏ
                     replyThumbHtml = `<div class="msg-reply-quote msg-reply-quote--image" data-reply-target="${escapeHtml(String(replyId))}">
                         <div class="msg-reply-image-head">
-                            <span class="msg-reply-image-icon" aria-hidden="true">↩</span>
+                            <span class="msg-reply-image-icon" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 19l-7-7 7-7"/><path d="M3 12h18"/></svg></span>
                             <span class="msg-reply-image-name">${escapeHtml(replyNameLabel)}</span>
                         </div>
                         <img src="${escapeHtml(replyImgUrl)}" class="msg-reply-thumb" alt="Photo" loading="lazy" />
