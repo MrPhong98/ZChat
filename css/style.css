@@ -401,7 +401,7 @@ select.custom-select {
 }
 
 
-/* Reply ảnh: mũi tên trái + tên nhỏ + ảnh thu nhỏ */
+/* Reply ảnh: icon cong + tên + ảnh nhỏ */
 .msg-reply-quote--image {
     padding: 0 !important;
     background: transparent !important;
