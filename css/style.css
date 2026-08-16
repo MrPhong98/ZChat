@@ -213,6 +213,18 @@ textarea { field-sizing: content; }
     100% { background-color: transparent; }
 }
 
+/* Lắc trái-phải khi bấm vào tin reply */
+.msg-reply-shake {
+    animation: msg-reply-shake 0.55s ease;
+}
+@keyframes msg-reply-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+}
+
 
 /*profile.html / shared theme extras */
 :root, [data-theme="dark"] {
@@ -283,7 +295,7 @@ select.custom-select {
     vertical-align: baseline;
 }
 
-/* Composer: cao bằng nút + (40px = h-10), pill */
+/* Composer: cao bằng nút + (40px), pill */
 #composerShell {
     height: 40px;
     min-height: 40px;
@@ -293,7 +305,7 @@ select.custom-select {
 }
 #composerShell.is-multiline {
     height: auto;
-    min-height: 40px;
+    min-height: 44px;
     align-items: flex-end;
     padding-top: 6px;
     padding-bottom: 6px;
@@ -302,9 +314,9 @@ select.custom-select {
 #messageInput {
     display: block;
     width: 100%;
-    height: 24px;
-    min-height: 24px;
-    line-height: 24px;
+    height: 28px;
+    min-height: 28px;
+    line-height: 28px;
     padding: 0 !important;
     margin: 0;
     overflow-y: hidden;
