@@ -2676,18 +2676,25 @@ function getVerifiedBadge(isVerified) {
     function autoResizeMessageInput() {
         if (!messageInput) return;
         const shell = document.getElementById("composerShell");
-        // Reset về 1 dòng để đo
         const singleLineHeight = 24;
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
         const maxHeight = Math.min(320, Math.max(96, Math.round(viewportHeight * 0.42)));
+        const saved = messageInput.value || "";
+        const hasNewline = /\n/.test(saved);
 
         if (shell) shell.classList.remove("is-multiline");
-        messageInput.style.height = "0px";
         messageInput.style.maxHeight = "none";
         messageInput.style.overflowY = "hidden";
 
+        // Baseline 1 dòng — 1 ký tự không còn bị giãn
+        messageInput.value = "M";
+        messageInput.style.height = "0px";
+        const oneLineScroll = messageInput.scrollHeight;
+        messageInput.value = saved;
+        messageInput.style.height = "0px";
         const contentHeight = messageInput.scrollHeight;
-        const isMultiline = contentHeight > singleLineHeight + 1;
+
+        const isMultiline = hasNewline || contentHeight > oneLineScroll + 2;
 
         if (!isMultiline) {
             messageInput.style.height = singleLineHeight + "px";
@@ -2697,7 +2704,7 @@ function getVerifiedBadge(isVerified) {
 
         if (shell) shell.classList.add("is-multiline");
         messageInput.style.maxHeight = maxHeight + "px";
-        messageInput.style.height = Math.min(contentHeight, maxHeight) + "px";
+        messageInput.style.height = Math.min(Math.max(contentHeight, singleLineHeight), maxHeight) + "px";
         messageInput.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
     }
 
