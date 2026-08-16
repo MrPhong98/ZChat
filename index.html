@@ -406,8 +406,8 @@
                                 style="color: var(--muted);">
                             <i data-lucide="video" class="w-[18px] h-[18px]"></i>
                         </button>
-                        <button type="button" aria-label="Search in conversation"
-                                class="hidden sm:flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
+                        <button type="button" id="searchInChatBtn" aria-label="Search in conversation"
+                                class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated"
                                 style="color: var(--muted);">
                             <i data-lucide="search" class="w-[18px] h-[18px]"></i>
                         </button>
@@ -418,6 +418,19 @@
                         </button>
                     </div>
                 </header>
+
+                <!-- Search in conversation panel -->
+                <div id="chatSearchPanel" class="chat-search-panel" hidden>
+                    <div class="chat-search-top">
+                        <div class="chat-search-field">
+                            <i data-lucide="search" class="chat-search-ico"></i>
+                            <input id="chatSearchInput" type="text" placeholder="Search in this chat..." autocomplete="off" />
+                        </div>
+                        <button type="button" id="chatSearchClose" class="chat-search-close">Cancel</button>
+                    </div>
+                    <div id="chatSearchStatus" class="chat-search-status">Type to search messages</div>
+                    <div id="chatSearchResults" class="chat-search-results"></div>
+                </div>
 
                 <!-- Messages Feed -->
                 <div id="messageFeed" class="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-4 py-5 pb-24 sm:px-8"></div>
@@ -460,7 +473,7 @@
                         </button>
                         <input type="file" id="fileInput" class="hidden"/>
 
-                        <div id="composerShell" class="flex flex-1 min-h-10 items-end gap-1.5 rounded-[22px] pl-4 pr-1.5 py-1 mb-0.5"
+                        <div id="composerShell" class="flex flex-1 min-h-10 items-end gap-1.5 rounded-[22px] pl-4 pr-1.5 py-1"
                              style="background-color: color-mix(in srgb, var(--elevated2) 72%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--transparent-border);">
                             <textarea
                                     id="messageInput"
