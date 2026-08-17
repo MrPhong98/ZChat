@@ -955,6 +955,20 @@ function getVerifiedBadge(isVerified) {
 
         currentUsername = username;
         localStorage.setItem("zchat_username", username);
+
+        // Passcode: chưa unlock / hết 50h → recovery.html (Create hoặc Enter)
+        // recovery.js tự phân nhánh Create nếu chưa có trên server
+        try {
+            const TTL_MS = 50 * 60 * 60 * 1000;
+            const unlockedAt = parseInt(localStorage.getItem("zchat_passcode_unlocked_at") || "0", 10) || 0;
+            const stillOk = unlockedAt > 0 && (Date.now() - unlockedAt) < TTL_MS;
+            const onRecoveryPage = /recovery\.html/i.test(location.pathname || "") || /recovery\.html/i.test(location.href || "");
+            if (!stillOk && !onRecoveryPage) {
+                window.location.replace("recovery.html");
+                return;
+            }
+        } catch (_) {}
+
         onboarding.classList.add("hidden");
         if (recoveryModal) recoveryModal.classList.add("hidden");
         appShell.classList.remove("hidden");
