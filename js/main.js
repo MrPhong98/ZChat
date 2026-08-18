@@ -3874,9 +3874,9 @@ function getVerifiedBadge(isVerified) {
             .subscribe((status) => {
                 console.log("[ZChat] Realtime status:", status);
                 if (status === "SUBSCRIBED") {
-                    console.log("[ZChat] Realtime OK — tin nhắn mới sẽ hiện không cần reload");
+                    console.log("[ZChat] Realtime OK");
                 } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-                    console.error("[ZChat] Realtime FAILED. Bật Replication cho bảng messages trên Supabase.");
+                    console.error("[ZChat] Realtime FAILED");
                 }
             });
 
