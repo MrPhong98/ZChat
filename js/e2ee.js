@@ -78,62 +78,28 @@
     function getLocalPrivateKey() { return localStorage.getItem("zchat_private_key") || ""; }
     function getLocalPublicKey() { return localStorage.getItem("zchat_public_key") || ""; }
 
-    /**
-     * Chỉ LẤY key từ server (cache local để decrypt nhanh).
-     * KHÔNG bao giờ generate / ghi đè key ở đây.
-     * Sinh cặp key chỉ khi ĐĂNG KÝ tài khoản mới (auth.js → generateKeyPairJwk).
-     */
     async function ensureUserKeys(username, existingUserRow) {
-        if (!username) {
+        if (!global.supabaseClient || !username) {
             return { publicKey: getLocalPublicKey(), privateKey: getLocalPrivateKey() };
         }
-
-        // Ưu tiên server — mọi thiết bị dùng cùng một cặp key
-        if (global.supabaseClient) {
-            let row = existingUserRow;
-            if (!row || !row.public_key || !row.private_key) {
-                try {
-                    const { data, error } = await global.supabaseClient
-                        .from("users")
-                        .select("username, public_key, private_key, id")
-                        .ilike("username", username)
-                        .maybeSingle();
-                    if (error) console.error("[E2EE] ensureUserKeys fetch:", error);
-                    if (data) row = data;
-                } catch (e) {
-                    console.error("[E2EE] ensureUserKeys exception:", e);
-                }
-            }
-
-            if (row && row.public_key && row.private_key) {
-                cacheKeysLocally(row.public_key, row.private_key);
-                return {
-                    publicKey: row.public_key,
-                    privateKey: row.private_key,
-                    userId: row.id || null,
-                };
-            }
-
-            // Có user nhưng thiếu key → không tự generate (tránh phá tin cũ trên thiết bị khác)
-            if (row) {
-                console.warn(
-                    "[E2EE] User có trên server nhưng thiếu public_key/private_key. " +
-                    "Không regenerate. Chỉ tạo key khi đăng ký tài khoản mới."
-                );
-                return {
-                    publicKey: row.public_key || getLocalPublicKey() || "",
-                    privateKey: row.private_key || getLocalPrivateKey() || "",
-                    userId: row.id || null,
-                };
-            }
+        let row = existingUserRow;
+        if (!row) {
+            const { data } = await global.supabaseClient
+                .from("users").select("username, public_key, private_key, id")
+                .ilike("username", username).maybeSingle();
+            row = data;
         }
-
-        // Offline / chưa có supabase: dùng cache local nếu có (không tạo mới)
-        return {
-            publicKey: getLocalPublicKey() || "",
-            privateKey: getLocalPrivateKey() || "",
-            userId: null,
-        };
+        if (row && row.public_key && row.private_key) {
+            cacheKeysLocally(row.public_key, row.private_key);
+            return { publicKey: row.public_key, privateKey: row.private_key, userId: row.id };
+        }
+        const pair = await generateKeyPairJwk();
+        const { error } = await global.supabaseClient
+            .from("users").update({ public_key: pair.publicKey, private_key: pair.privateKey })
+            .ilike("username", username);
+        if (error) console.error("[E2EE] save keys:", error);
+        cacheKeysLocally(pair.publicKey, pair.privateKey);
+        return { publicKey: pair.publicKey, privateKey: pair.privateKey, userId: row && row.id };
     }
 
     async function fetchPublicKeyForUsername(username) {
@@ -248,7 +214,7 @@
             );
             const bytes = new Uint8Array(hashBuf);
             let digits = "";
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 15; i++) {
                 digits += String(bytes[i] % 10);
                 digits += String(Math.floor(bytes[i] / 10) % 10);
             }
@@ -285,23 +251,16 @@
 
     /**
      * Bảng verified_users:
-     *   verifier_id, verified_user_id, verifier_username, verified_username, created_at
+     *   verifier_id, verified_user_id, created_at
      */
     async function markUserAsVerified(targetUserId, myUsername, partnerUsername) {
         if (!global.supabaseClient) throw new Error("Supabase client missing");
         if (!targetUserId) throw new Error("targetUserId required");
-        const { me, myId } = await _resolveMyUser(myUsername);
+        const { myId } = await _resolveMyUser(myUsername);
         if (!myId) throw new Error("Current user id missing");
-        const tid = String(targetUserId);
-        let verifiedName = partnerUsername || null;
-        if (!verifiedName) {
-            verifiedName = await _resolveUsernameById(tid);
-        }
         const row = {
             verifier_id: myId,
-            verified_user_id: tid,
-            verifier_username: me || null,
-            verified_username: verifiedName || null,
+            verified_user_id: String(targetUserId),
         };
         const { data, error } = await global.supabaseClient
             .from("verified_users")
