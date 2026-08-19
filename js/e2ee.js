@@ -17,13 +17,17 @@
     let _cachedPubJwk = null, _cachedPubKey = null;
 
     function bufToB64(buf) {
-        const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf) : buf;
+        const bytes = buf instanceof ArrayBuffer ? new Uint8Array(buf)
+            : (buf instanceof Uint8Array ? buf : new Uint8Array(buf));
         let s = "";
-        for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
         return btoa(s);
     }
     function b64ToBuf(b64) {
-        const s = atob(b64);
+        const s = atob(String(b64).replace(/\s/g, ""));
         const bytes = new Uint8Array(s.length);
         for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
         return bytes.buffer;
@@ -89,10 +93,39 @@
                 .ilike("username", username).maybeSingle();
             row = data;
         }
+        // Đủ cặp trên server → dùng server (đồng bộ thiết bị)
         if (row && row.public_key && row.private_key) {
             cacheKeysLocally(row.public_key, row.private_key);
             return { publicKey: row.public_key, privateKey: row.private_key, userId: row.id };
         }
+        // Server chỉ có public / thiếu private → ƯU TIÊN private local, KHÔNG regenerate
+        // (regenerate sẽ làm hỏng toàn bộ tin cũ)
+        const localPub = getLocalPublicKey();
+        const localPriv = getLocalPrivateKey();
+        if (row && row.public_key && localPriv) {
+            cacheKeysLocally(row.public_key, localPriv);
+            // cố gắng bổ sung private lên server nếu thiếu
+            try {
+                await global.supabaseClient
+                    .from("users")
+                    .update({ private_key: localPriv })
+                    .ilike("username", username);
+            } catch (_) {}
+            return { publicKey: row.public_key, privateKey: localPriv, userId: row && row.id };
+        }
+        if (localPub && localPriv) {
+            cacheKeysLocally(localPub, localPriv);
+            if (row && !row.public_key) {
+                try {
+                    await global.supabaseClient
+                        .from("users")
+                        .update({ public_key: localPub, private_key: localPriv })
+                        .ilike("username", username);
+                } catch (_) {}
+            }
+            return { publicKey: localPub, privateKey: localPriv, userId: row && row.id };
+        }
+        // Thật sự chưa có key → tạo mới một lần
         const pair = await generateKeyPairJwk();
         const { error } = await global.supabaseClient
             .from("users").update({ public_key: pair.publicKey, private_key: pair.privateKey })
@@ -159,22 +192,59 @@
         if (!encryptedBase64 || !myPrivateKeyJwk) return null;
         try {
             if (!looksLikeE2eePayload(encryptedBase64)) return null;
-            const payload = JSON.parse(new TextDecoder().decode(b64ToBuf(encryptedBase64)));
+            let rawJson = encryptedBase64;
+            // payload có thể là base64(JSON) hoặc JSON thuần
+            try {
+                if (!encryptedBase64.trim().startsWith("{")) {
+                    rawJson = new TextDecoder().decode(b64ToBuf(encryptedBase64));
+                }
+            } catch (_) {
+                return null;
+            }
+            const payload = JSON.parse(rawJson);
             if (!payload || !payload.c || !payload.iv) return null;
             const privKey = await importPrivateKey(myPrivateKeyJwk);
-            let wrappedB64 = payload.k || null;
-            if (!wrappedB64 && payload.keys) {
-                const me = (localStorage.getItem("zchat_username") || "").toLowerCase();
-                wrappedB64 = payload.keys[me] || Object.values(payload.keys).find(Boolean) || null;
+
+            // Ứng viên wrapped AES key: keys[me] trước, rồi mọi keys khác, rồi payload.k
+            const candidates = [];
+            const me = (localStorage.getItem("zchat_username") || "").toLowerCase().trim();
+            if (payload.keys && typeof payload.keys === "object") {
+                if (me && payload.keys[me]) candidates.push(payload.keys[me]);
+                // username có thể lệch hoa/thường / khoảng trắng
+                Object.keys(payload.keys).forEach((k) => {
+                    const v = payload.keys[k];
+                    if (!v) return;
+                    if (me && k.toLowerCase().trim() === me && !candidates.includes(v)) candidates.push(v);
+                    else if (!candidates.includes(v)) candidates.push(v);
+                });
             }
-            if (!wrappedB64) return null;
-            const rawAes = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, privKey, b64ToBuf(wrappedB64));
-            const aesKey = await crypto.subtle.importKey("raw", rawAes, AES_ALGO, false, ["decrypt"]);
-            const plainBuf = await crypto.subtle.decrypt(
-                { name: "AES-GCM", iv: new Uint8Array(b64ToBuf(payload.iv)) },
-                aesKey, b64ToBuf(payload.c)
-            );
-            return new TextDecoder().decode(plainBuf);
+            if (payload.k && !candidates.includes(payload.k)) candidates.push(payload.k);
+            if (!candidates.length) return null;
+
+            let lastErr = null;
+            for (const wrappedB64 of candidates) {
+                try {
+                    const rawAes = await crypto.subtle.decrypt(
+                        { name: "RSA-OAEP" }, privKey, b64ToBuf(wrappedB64)
+                    );
+                    const aesKey = await crypto.subtle.importKey(
+                        "raw", rawAes, AES_ALGO, false, ["decrypt"]
+                    );
+                    const plainBuf = await crypto.subtle.decrypt(
+                        { name: "AES-GCM", iv: new Uint8Array(b64ToBuf(payload.iv)) },
+                        aesKey,
+                        b64ToBuf(payload.c)
+                    );
+                    return new TextDecoder().decode(plainBuf);
+                } catch (err) {
+                    lastErr = err;
+                }
+            }
+            // Chỉ log khi tất cả candidate đều fail
+            if (lastErr) {
+                console.warn("[E2EE] decrypt failed:", lastErr && lastErr.message);
+            }
+            return null;
         } catch (err) {
             console.warn("[E2EE] decrypt failed:", err && err.message);
             return null;
