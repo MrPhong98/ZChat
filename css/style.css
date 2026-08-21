@@ -328,6 +328,10 @@ select.custom-select {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;
+    font-size: 13px;
+}
+#messageInput::placeholder {
+    font-size: 13px;
 }
 #composerShell.is-multiline #messageInput {
     /* Height set from JS */
