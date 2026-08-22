@@ -428,6 +428,40 @@ function getVerifiedBadge(isVerified) {
     /** Cache user id của mình + map conversationId → otherUsername */
     let myUserIdCache = localStorage.getItem("zchat_user_id") || null;
     const conversationOtherName = Object.create(null); // { [convId]: username }
+    const userIdToName = Object.create(null); // { [uuid]: username }
+
+    function myIdNow() {
+        return myUserIdCache || localStorage.getItem("zchat_user_id") || "";
+    }
+
+    /** Tin của mình chỉ theo sender_id (uuid) */
+    function isRowFromMe(row, myId) {
+        if (!row || !myId || !row.sender_id) return false;
+        return String(row.sender_id) === String(myId);
+    }
+
+    function senderIdFromRow(row, myId) {
+        return isRowFromMe(row, myId) ? "me" : (row.sender_id || "other");
+    }
+
+    async function resolveUsernameByUserId(userId) {
+        if (!userId) return null;
+        if (userIdToName[userId]) return userIdToName[userId];
+        if (!window.supabaseClient) return null;
+        try {
+            const { data, error } = await window.supabaseClient
+                .from("users")
+                .select("id, username")
+                .eq("id", userId)
+                .maybeSingle();
+            if (error || !data) return null;
+            if (data.username) userIdToName[data.id] = data.username;
+            return data.username || null;
+        } catch (err) {
+            console.error("[ZChat] resolveUsernameByUserId:", err);
+            return null;
+        }
+    }
 
     async function resolveUserIdByUsername(username) {
         if (!window.supabaseClient || !username) return null;
@@ -1388,14 +1422,14 @@ function getVerifiedBadge(isVerified) {
     // Đánh dấu các tin nhắn của người kia trong đoạn chat này là đã xem (cho tính năng "Seen")
     async function markChatAsRead(chatId) {
         if (!window.supabaseClient || !chatId || chatId.startsWith("saved_")) return;
-        const me = (currentUsername || localStorage.getItem("zchat_username") || "").trim();
-        if (!me) return;
+        const myId = myIdNow();
+        if (!myId) return;
         try {
             const { error } = await window.supabaseClient
                 .from("messages")
                 .update({ read_at: new Date().toISOString() })
                 .eq("chat_id", chatId)
-                .neq("sender_username", me)
+                .neq("sender_id", myId)
                 .is("read_at", null);
             if (error) console.error("[ZChat] markChatAsRead error:", error);
         } catch (err) {
@@ -3095,7 +3129,7 @@ function getVerifiedBadge(isVerified) {
             const fetchPreview = async (chatId) => {
                 const { data, error } = await window.supabaseClient
                     .from("messages")
-                    .select("id, chat_id, sender_username, content, created_at, read_at")
+                    .select("id, chat_id, sender_id, content, created_at, read_at")
                     .eq("chat_id", chatId)
                     .order("created_at", { ascending: false })
                     .limit(PREVIEW_PER_CHAT);
@@ -3118,7 +3152,7 @@ function getVerifiedBadge(isVerified) {
             if (!convIds.length) {
                 const { data: legacyRows } = await window.supabaseClient
                     .from("messages")
-                    .select("id, chat_id, sender_username, content, created_at, read_at")
+                    .select("id, chat_id, sender_id, content, created_at, read_at")
                     .or(`chat_id.ilike.chat_${meLower}_%,chat_id.ilike.chat_%_${meLower}`)
                     .order("created_at", { ascending: false })
                     .limit(40);
@@ -3143,7 +3177,7 @@ function getVerifiedBadge(isVerified) {
 
                 let chat = state.chats.find((c) => c.id === chatId);
                 if (!chat) {
-                    let otherName = resolveOtherNameFromChatId(chatId, me, m.sender_username);
+                    let otherName = resolveOtherNameFromChatId(chatId, me, userIdToName[m.sender_id] || null);
                     if (isUuid(chatId) && (otherName === "Chat User" || !otherName)) {
                         otherName = conversationOtherName[chatId] || otherName;
                         pendingNameResolves.push({ chatId, meId: myId });
@@ -3168,7 +3202,7 @@ function getVerifiedBadge(isVerified) {
                 if (!chat.messages.some((existing) => existing.id === m.id)) {
                     chat.messages.push({
                         id: m.id,
-                        senderId: m.sender_username === me ? "me" : m.sender_username || "other",
+                        senderId: senderIdFromRow(m, myIdNow()),
                         text: m.content || "",
                         createdAt: new Date(m.created_at).getTime(),
                         status: m.read_at ? "read" : "delivered",
@@ -3177,11 +3211,15 @@ function getVerifiedBadge(isVerified) {
                 // Cập nhật tên nếu đang placeholder
                 if (
                     (chat.participant.name === "Chat User" || !chat.participant.name) &&
-                    m.sender_username &&
-                    m.sender_username.toLowerCase() !== meLower
+                    m.sender_id &&
+                    String(m.sender_id) !== String(myIdNow())
                 ) {
-                    chat.participant.name = m.sender_username;
-                    conversationOtherName[chatId] = m.sender_username;
+                    const cachedName = userIdToName[m.sender_id];
+                    if (cachedName) {
+                        chat.participant.name = cachedName;
+                        conversationOtherName[chatId] = cachedName;
+                    }
+                    chat.participant.userId = m.sender_id;
                 }
             }
 
@@ -3196,7 +3234,7 @@ function getVerifiedBadge(isVerified) {
                 })
             );
 
-            // Bổ sung: nếu còn "Chat User" mà có tin từ người khác → lấy sender_username
+            // Bổ sung: nếu còn "Chat User" mà có tin từ người khác → resolve tên theo sender_id
             state.chats.forEach((chat) => {
                 if (chat.participant.name !== "Chat User" && chat.participant.name) return;
                 if (String(chat.id).startsWith("saved_")) {
@@ -3205,15 +3243,33 @@ function getVerifiedBadge(isVerified) {
                     return;
                 }
                 const fromMsg = chat.messages.find(
-                    (m) => m.senderId && m.senderId !== "me" && m.senderId !== me
+                    (m) => m.senderId && m.senderId !== "me"
                 );
                 if (fromMsg && fromMsg.senderId) {
-                    chat.participant.name = fromMsg.senderId;
-                    conversationOtherName[chat.id] = fromMsg.senderId;
+                    const sid = fromMsg.senderId;
+                    chat.participant.userId = sid;
+                    const cached = userIdToName[sid];
+                    if (cached) {
+                        chat.participant.name = cached;
+                        conversationOtherName[chat.id] = cached;
+                    }
                 } else if (conversationOtherName[chat.id]) {
                     chat.participant.name = conversationOtherName[chat.id];
                 }
             });
+
+            await Promise.all(
+                state.chats
+                    .filter((c) => c.participant && c.participant.userId &&
+                        (!c.participant.name || c.participant.name === "Chat User"))
+                    .map(async (c) => {
+                        const n = await resolveUsernameByUserId(c.participant.userId);
+                        if (n) {
+                            c.participant.name = n;
+                            conversationOtherName[c.id] = n;
+                        }
+                    })
+            );
 
             state.chats.forEach((c) => {
                 c.messages.sort((a, b) => a.createdAt - b.createdAt);
@@ -3265,7 +3321,7 @@ function getVerifiedBadge(isVerified) {
             for (;;) {
                 const { data, error } = await window.supabaseClient
                     .from("messages")
-                    .select("id, chat_id, sender_username, content, created_at, read_at")
+                    .select("id, chat_id, sender_id, content, created_at, read_at")
                     .eq("chat_id", chatId)
                     .order("created_at", { ascending: false })
                     .range(offset, offset + PAGE - 1);
@@ -3290,7 +3346,7 @@ function getVerifiedBadge(isVerified) {
                 if (byId.has(m.id)) return;
                 byId.set(m.id, {
                     id: m.id,
-                    senderId: m.sender_username === me ? "me" : m.sender_username || "other",
+                    senderId: senderIdFromRow(m, myIdNow()),
                     text: m.content || "",
                     createdAt: new Date(m.created_at).getTime(),
                     status: m.read_at ? "read" : "delivered",
@@ -3412,10 +3468,14 @@ function getVerifiedBadge(isVerified) {
             }
         }
 
+        let senderUuid = myIdNow();
+        if (!senderUuid && typeof getMyUserId === "function") {
+            try { senderUuid = (await getMyUserId()) || ""; } catch (_) {}
+        }
         const row = {
             id: makeUuid(),
             chat_id: realChatId,
-            sender_username: msgObj.senderId === "me" ? me : String(msgObj.senderId || me),
+            sender_id: senderUuid || null,
             content: contentToStore,
             created_at: new Date(msgObj.createdAt || Date.now()).toISOString(),
         };
@@ -3688,7 +3748,7 @@ function getVerifiedBadge(isVerified) {
                             if (String(chatId).startsWith("saved_")) {
                                 otherName = me || "Me";
                             } else {
-                                otherName = resolveOtherNameFromChatId(chatId, me, newMsg.sender_username);
+                                otherName = resolveOtherNameFromChatId(chatId, me, userIdToName[newMsg.sender_id] || null);
                                 if (isUuid(chatId) && (otherName === "Chat User" || !otherName)) {
                                     const myId = await getMyUserId();
                                     const resolved = await resolveOtherNameFromConversationId(chatId, myId);
@@ -3696,9 +3756,11 @@ function getVerifiedBadge(isVerified) {
                                 }
                                 // Cuối cùng: dùng sender nếu không phải mình
                                 if ((!otherName || otherName === "Chat User") &&
-                                    newMsg.sender_username &&
-                                    newMsg.sender_username.toLowerCase() !== meLower) {
-                                    otherName = newMsg.sender_username;
+                                    newMsg.sender_id &&
+                                    String(newMsg.sender_id) !== String(myIdNow())) {
+                                    const n = userIdToName[newMsg.sender_id] ||
+                                        (await resolveUsernameByUserId(newMsg.sender_id));
+                                    if (n) otherName = n;
                                 }
                             }
                             const selfNote = String(chatId).startsWith("saved_");
@@ -3732,7 +3794,7 @@ function getVerifiedBadge(isVerified) {
                         if (chat.messages.some((m) => m.id === newMsg.id)) return;
 
                         const ts = new Date(newMsg.created_at).getTime();
-                        const isMineMsg = newMsg.sender_username === me;
+                        const isMineMsg = isRowFromMe(newMsg, myIdNow());
 
                         if (isMineMsg) {
                             const pending = [...chat.messages].reverse().find((m) =>
@@ -3762,7 +3824,7 @@ function getVerifiedBadge(isVerified) {
 
                         chat.messages.push({
                             id: newMsg.id,
-                            senderId: isMineMsg ? "me" : newMsg.sender_username || "other",
+                            senderId: isMineMsg ? "me" : (newMsg.sender_id || "other"),
                             text: rtText,
                             createdAt: ts,
                             status: "read",
@@ -3771,12 +3833,7 @@ function getVerifiedBadge(isVerified) {
 
                         if (state.activeChatId === chat.id) {
                             renderMessages(chat);
-                            // Giữ tick xanh — không dùng textContent (sẽ xóa badge HTML)
-                            if (chatHeaderName) {
-                                chatHeaderName.innerHTML =
-                                    escapeHtml(chat.participant.name) +
-                                    getVerifiedBadge(!!chat.participant.isVerified);
-                            }
+                            if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
                             markChatAsRead(chat.id);
                         } else if (!isMineMsg) {
                             chat.unread = (chat.unread || 0) + 1;
