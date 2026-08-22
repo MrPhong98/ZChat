@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Report a bug — ZChat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="/assets/img/favicon-32.png" type="image/png" sizes="any"/>
+    <link rel="icon" href="/assets/img/favicon-16.png" type="image/png" sizes="any"/>
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/apple-touch-icon.png"/>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        canvas: "var(--canvas)", surface: "var(--surface)", elevated: "var(--elevated)",
+                        elevated2: "var(--elevated2)", hairline: "var(--hairline)", ink: "var(--ink)",
+                        muted: "var(--muted)", faint: "var(--faint)",
+                    },
+                    fontFamily: { display: ["Manrope", "sans-serif"], body: ["Inter", "sans-serif"] },
+                    borderRadius: { pill: "999px", bubble: "20px" },
+                },
+            },
+        };
+    </script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="h-full font-body" style="background-color: var(--canvas); color: var(--ink);">
+
+<div class="flex h-screen w-full overflow-hidden pb-[60px] sm:pb-0" style="background-color: var(--canvas);">
+    <main class="flex h-full w-full overflow-hidden relative">
+
+        <!-- Navbar giống index.html (bottomNav) — không Contacts, không icon profile trên mobile -->
+        <nav id="bottomNav"
+             class="fixed sm:static bottom-0 left-0 z-50 flex sm:h-full w-full sm:w-[72px] h-[60px] shrink-0 flex-row sm:flex-col items-center justify-around sm:justify-between sm:py-5 px-4 sm:px-0"
+             style="border-top: 1px solid var(--hairline); sm:border-top: none; sm:border-right: 1px solid var(--hairline); background-color: var(--canvas);" aria-label="Primary">
+            <div class="contents sm:flex sm:flex-col sm:items-center sm:w-full">
+                <div class="hidden sm:flex mb-6 h-9 w-9 items-center justify-center">
+                    <a href="index.html" aria-label="Home">
+                        <svg width="26" height="26" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+                            <path d="M50 8C26.8 8 8 25.4 8 47c0 11.2 5 21.3 13.1 28.4L17 92l19.1-7.7A45.6 45.6 0 0 0 50 86c23.2 0 42-17.4 42-39S73.2 8 50 8Z"
+                                  fill="currentColor" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                </div>
+                <ul class="flex flex-row sm:flex-col flex-1 sm:flex-initial items-center justify-around sm:justify-start w-full sm:w-auto gap-2">
+                    <li>
+                        <a href="index.html" aria-label="Chats"
+                           class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                           style="color: var(--muted);">
+                            <i data-lucide="message-circle" class="w-5 h-5"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="settings.html" aria-label="Settings"
+                           class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-elevated"
+                           style="color: var(--muted);">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="report.html" aria-label="Report a bug"
+                           class="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors"
+                           style="background-color: var(--ink); color: var(--canvas);">
+                            <i data-lucide="bug" class="w-5 h-5"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <a href="profile.html" id="profileBtn" aria-label="Profile"
+               class="hidden sm:flex rounded-full items-center justify-center shrink-0">
+                <div id="profileAvatar"
+                     class="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold select-none"></div>
+            </a>
+        </nav>
+
+        <!-- Main -->
+        <div class="flex min-w-0 flex-1 flex-col h-full min-h-0" style="background-color: var(--canvas);">
+            <header class="flex items-center gap-3 px-4 pb-3 pt-5 shrink-0"
+                    style="border-bottom: 1px solid var(--hairline); background-color: var(--surface);">
+                <a href="index.html"
+                   class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-elevated sm:hidden"
+                   style="color: var(--muted);" aria-label="Back">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </a>
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                         style="background-color: var(--elevated); color: var(--muted);">
+                        <i data-lucide="bug" class="w-[18px] h-[18px]"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h1 class="font-display text-lg font-extrabold tracking-tight truncate" style="color: var(--ink);">Report a bug</h1>
+                        <p class="text-[12px] truncate" style="color: var(--muted);">Help us improve ZChat</p>
+                    </div>
+                </div>
+            </header>
+            <div class="flex-1 overflow-y-auto scrollbar-thin" style="background-color: var(--canvas);">
+                <div class="mx-auto w-full max-w-xl px-4 py-5 flex flex-col gap-4">
+                    <div class="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                         style="background-color: var(--surface); border: 1px solid var(--hairline); color: var(--muted);">
+                        Describe the issue, steps to reproduce, and your device if possible. Reports go to the ZChat team via the form below.
+                    </div>
+                    <div class="rounded-3xl overflow-hidden shadow-sm"
+                         style="background-color: var(--surface); border: 1px solid var(--hairline);">
+                        <iframe id="tallyFrame"
+                                data-tally-src="https://tally.so/embed/yP85Ax?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
+                                loading="lazy" width="100%" height="520" frameborder="0" title="Report a bug"
+                                style="display:block;width:100%;border:0;min-height:520px;background:transparent;"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="js/report.js"></script>
+</body>
+</html>
