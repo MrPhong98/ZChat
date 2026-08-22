@@ -701,6 +701,19 @@ function getVerifiedBadge(isVerified) {
         p.avatarEmoji = localStorage.getItem("zchat_avatar_emoji") || p.avatarEmoji || null;
         p.avatarUrl = localStorage.getItem("zchat_avatar_url") || p.avatarUrl || null;
 
+        // Tick xanh trên chat "nhắn cho bản thân" (is_verified của chính mình)
+        if (displayName) {
+            fetchAvatarForUsername(displayName).then((row) => {
+                if (!row || !savedChat || !savedChat.participant) return;
+                applyAvatarFields(savedChat.participant, row);
+                savedChat.participant.isSelfNotes = true;
+                savedChat.participant.name = displayName;
+                if (row.id) savedChat.participant.userId = row.id;
+                renderChatList();
+                if (state.activeChatId === savedChat.id) renderActiveChat();
+            });
+        }
+
         if (!state.activeChatId) state.activeChatId = savedChatId;
         return savedChatId;
     }
