@@ -145,7 +145,8 @@ Open `index.html` in a modern browser (Web Crypto + Realtime required).
 
 ## License
 
-Add your license here (e.g. MIT).
+Copyright © 2026 ZChat. All rights reserved.
+Unauthorized copying, modification, or distribution of this software is strictly prohibited.
 
 ---
 
