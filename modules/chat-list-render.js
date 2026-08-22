@@ -1,0 +1,228 @@
+/* ============================================================
+ * 08-chat-list-render.js
+ * Render danh sách chat (sidebar), chọn chat, đánh dấu đã đọc. Phụ thuộc: 02, 03, 04, 07.
+ * ============================================================ */
+function getFilteredSortedChats() {
+    const q = state.searchQuery.trim().toLowerCase();
+    return state.chats
+        .filter((c) => c.participant.name.toLowerCase().includes(q))
+        .slice()
+        .sort((a, b) => {
+            const ap = isChatPinned(a.id) ? 1 : 0;
+            const bp = isChatPinned(b.id) ? 1 : 0;
+            if (ap !== bp) return bp - ap;
+            const at = a.messages.length ? a.messages[a.messages.length - 1].createdAt : 0;
+            const bt = b.messages.length ? b.messages[b.messages.length - 1].createdAt : 0;
+            return bt - at;
+        });
+}
+
+function renderChatList() {
+    const list = getFilteredSortedChats();
+    chatList.innerHTML = "";
+
+    if (list.length === 0) {
+        chatListEmpty.classList.remove("hidden");
+        chatListEmpty.classList.add("flex");
+        icons();
+        return;
+    }
+    chatListEmpty.classList.add("hidden");
+    chatListEmpty.classList.remove("flex");
+
+    list.forEach((chat) => {
+        const last = chat.messages[chat.messages.length - 1] || null;
+        const isMine = last && last.senderId === "me";
+        const previewText = last ? (previewForMessage(last) || (last.attachment ? "📎 Attachment" : "")) : "No messages yet";
+        const active = chat.id === state.activeChatId;
+        const pinned = isChatPinned(chat.id);
+        const receiptIcon =
+            isMine && last
+                ? `<i data-lucide="${last.status === "read" ? "check-check" : "check"}" class="w-[14px] h-[14px] shrink-0" style="color: var(--muted);"></i>`
+                : "";
+        const pinIcon = pinned
+            ? `<i data-lucide="pin" class="w-[12px] h-[12px] shrink-0" style="color: var(--faint);"></i>`
+            : "";
+
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = `flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors`;
+        row.style.backgroundColor = active ? "var(--elevated)" : "transparent";
+        row.onmouseover = () => { if (!active) row.style.backgroundColor = "var(--elevated)"; };
+        row.onmouseout = () => { if (!active) row.style.backgroundColor = "transparent"; };
+
+        row.dataset.chatId = chat.id;
+        row.innerHTML = `
+        ${avatarHtml(chat.participant)}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center justify-between gap-2">
+            <span class="flex min-w-0 items-center gap-1.5 truncate">
+              ${pinIcon}
+              <span class="inline-flex min-w-0 items-center truncate text-[15px] font-bold" style="color: var(--ink);">${escapeHtml(chat.participant.name)}${getVerifiedBadge(!!chat.participant.isVerified)}</span>
+            </span>
+            ${last ? `<span class="shrink-0 text-xs font-medium" style="color: ${chat.unread > 0 ? "var(--ink)" : "var(--faint)"};">${formatListTimestamp(last.createdAt)}</span>` : ""}
+          </div>
+          <div class="mt-0.5 flex items-center justify-between gap-2">
+            <span class="flex min-w-0 items-center gap-1 truncate text-[13px]" style="color: var(--muted);">
+              ${receiptIcon}
+              <span class="truncate font-normal">${escapeHtml(previewText)}</span>
+            </span>
+            ${chat.unread > 0 ? `<span class="flex h-5 min-w-[20px] items-center justify-center rounded-pill px-1.5 text-[11px] font-bold" style="background-color: var(--ink); color: var(--canvas);">${chat.unread > 99 ? "99+" : chat.unread}</span>` : ""}
+          </div>
+        </div>
+      `;
+        row.addEventListener("click", () => selectChat(chat.id));
+        // Chuột phải (desktop)
+        row.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            openChatListMenu(chat, e.clientX, e.clientY);
+        });
+        // Nhấn giữ (mobile)
+        let pressTimer = null;
+        let longPressed = false;
+        row.addEventListener("touchstart", (e) => {
+            longPressed = false;
+            const t = e.touches[0];
+            pressTimer = setTimeout(() => {
+                longPressed = true;
+                openChatListMenu(chat, t.clientX, t.clientY);
+            }, 480);
+        }, { passive: true });
+        row.addEventListener("touchend", (e) => {
+            if (pressTimer) clearTimeout(pressTimer);
+            if (longPressed) e.preventDefault();
+        });
+        row.addEventListener("touchmove", () => {
+            if (pressTimer) clearTimeout(pressTimer);
+        }, { passive: true });
+
+        chatList.appendChild(row);
+    });
+
+    icons();
+}
+
+searchInput.addEventListener("input", (e) => {
+    state.searchQuery = e.target.value;
+    renderChatList();
+});
+
+function isMobileView() {
+    return window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+}
+
+function openSidebar() {
+    if (!sidebarWrap) return;
+    sidebarWrap.classList.remove("-translate-x-full");
+    if (sidebarScrim) sidebarScrim.classList.add("hidden");
+    // Trên mobile, quay lại danh sách chat thì hiện lại bottom nav + trả lại khoảng chừa cho nó
+    if (isMobileView() && bottomNav) {
+        bottomNav.classList.remove("hidden");
+        if (appShell) appShell.classList.add("pb-[60px]");
+    }
+}
+function closeSidebar() {
+    // Chỉ ẩn list trên mobile khi vào chat; desktop luôn hiện list
+    if (!sidebarWrap) return;
+    if (isMobileView()) {
+        sidebarWrap.classList.add("-translate-x-full");
+        // Ẩn bottom nav khi đang mở 1 chat trên mobile, đồng thời bỏ khoảng chừa pb-[60px] để không còn khe hở
+        if (bottomNav) bottomNav.classList.add("hidden");
+        if (appShell) appShell.classList.remove("pb-[60px]");
+    } else {
+        sidebarWrap.classList.remove("-translate-x-full");
+    }
+    if (sidebarScrim) sidebarScrim.classList.add("hidden");
+}
+if (openSidebarBtn) openSidebarBtn.addEventListener("click", openSidebar);
+if (closeSidebarBtn) closeSidebarBtn.addEventListener("click", closeSidebar);
+if (sidebarScrim) sidebarScrim.addEventListener("click", closeSidebar);
+
+// Đồng bộ lại trạng thái bottom nav khi resize qua lại giữa mobile/desktop
+window.addEventListener("resize", () => {
+    if (!bottomNav) return;
+    if (!isMobileView()) {
+        bottomNav.classList.remove("hidden");
+        if (appShell) appShell.classList.add("pb-[60px]");
+    } else if (state.activeChatId && sidebarWrap && sidebarWrap.classList.contains("-translate-x-full")) {
+        bottomNav.classList.add("hidden");
+        if (appShell) appShell.classList.remove("pb-[60px]");
+    } else {
+        bottomNav.classList.remove("hidden");
+        if (appShell) appShell.classList.add("pb-[60px]");
+    }
+});
+
+function selectChat(chatId) {
+    state.activeChatId = chatId;
+    const chat = state.chats.find((c) => c.id === chatId);
+    if (chat) chat.unread = 0;
+    cancelEditMode();
+    closeInfoDrawer();
+    closeSidebar();
+    renderChatList();
+    renderActiveChat();
+
+    loadMessagesForChat(chatId);
+    markChatAsRead(chatId);
+}
+
+// Đánh dấu các tin nhắn của người kia trong đoạn chat này là đã xem (cho tính năng "Seen")
+async function markChatAsRead(chatId) {
+    if (!window.supabaseClient || !chatId || chatId.startsWith("saved_")) return;
+    const myId = myIdNow();
+    if (!myId) return;
+    try {
+        const { error } = await window.supabaseClient
+            .from("messages")
+            .update({ read_at: new Date().toISOString() })
+            .eq("chat_id", chatId)
+            .neq("sender_id", myId)
+            .is("read_at", null);
+        if (error) console.error("[ZChat] markChatAsRead error:", error);
+    } catch (err) {
+        console.error("[ZChat] markChatAsRead exception:", err);
+    }
+}
+
+function statusIconMarkup(status) {
+    if (status === "read") {
+        return `<span class="text-[11px] font-medium" style="color: var(--muted);">Seen</span>`;
+    }
+    return "";
+}
+
+function renderActiveChat() {
+    const chat = state.chats.find((c) => c.id === state.activeChatId);
+
+    if (!chat) {
+        emptyState.classList.remove("hidden");
+        emptyState.classList.add("flex");
+        activeChatEl.classList.add("hidden");
+        activeChatEl.classList.remove("flex");
+        return;
+    }
+
+    emptyState.classList.add("hidden");
+    emptyState.classList.remove("flex");
+    activeChatEl.classList.remove("hidden");
+    activeChatEl.classList.add("flex");
+
+    chatHeaderAvatar.innerHTML = avatarHtml(chat.participant, 40);
+    const verifiedBadge = getVerifiedBadge(!!chat.participant.isVerified);
+    chatHeaderName.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
+    chatHeaderStatus.textContent = "";
+
+    document.getElementById("infoAvatar").innerHTML = avatarHtml(chat.participant, 64);
+    const infoNameEl = document.getElementById("infoName");
+    if (infoNameEl) infoNameEl.innerHTML = escapeHtml(chat.participant.name) + verifiedBadge;
+    document.getElementById("infoUsername").textContent = "@" + chat.participant.name.toLowerCase().replace(/\s+/g, "");
+
+    updateDisappearingUI(chat.disappearingTime || "off");
+    blockScreenshotsToggle.checked = !!chat.blockScreenshots;
+
+    applyScreenshotProtection(chat.blockScreenshots);
+
+    renderMessages(chat);
+    icons();
+}
