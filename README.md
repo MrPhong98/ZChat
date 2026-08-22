@@ -51,6 +51,7 @@ ZChat is a web-based messenger focused on privacy: messages can be encrypted cli
 ├── report.html             # Bug report (Tally embed)
 ├── css/
 │   └── style.css           # Theme variables, bubbles, composer, liquid glass
+├── modules (load order below)
 ├── js/
 │   ├── auth.js             # Supabase client / session helpers
 │   ├── e2ee.js             # Key management, encrypt/decrypt, safety number
@@ -58,9 +59,9 @@ ZChat is a web-based messenger focused on privacy: messages can be encrypted cli
 │   ├── settings.js         # Settings page logic
 │   ├── profile.js          # Profile page logic
 │   ├── report.js           # Report page theme / icons
-│   ├── webrtc.js           # Call UI + peer connection
-│   └── main modules (load order below)
+│   └── webrtc.js           # Call UI + peer connection
 ├── assets/img/             # Favicons, logos
+├── assets/audio/           #Audio Calling song
 └── README.md
 ```
 
