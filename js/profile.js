@@ -607,56 +607,23 @@
         localStorage.setItem("zchat_avatar_url", draft.avatarUrl || "");
         localStorage.setItem("zchat_theme", draft.theme);
 
-        // Đổi username thẳng cột users.username (không RPC rename_username)
+        // Đổi username lên Supabase (nếu có thay đổi) — dùng RPC rename_username
+        // để tự động migrate luôn sender_username + chat_id của tin nhắn cũ
         const usernameChanged = savedUsername && name.toLowerCase() !== savedUsername.toLowerCase();
         if (usernameChanged && window.supabaseClient) {
             try {
-                const userId = await resolveAccountUserId();
-                if (!userId) {
-                    usernameError.textContent = "Could not resolve account. Please re-login.";
-                    usernameError.classList.remove("hidden");
-                    return;
-                }
-
-                // Trùng username với user khác?
-                const { data: taken, error: takenErr } = await window.supabaseClient
-                    .from("users")
-                    .select("id")
-                    .ilike("username", name)
-                    .maybeSingle();
-                if (takenErr) {
-                    console.error("[ZChat] username check error:", takenErr);
-                    usernameError.textContent = takenErr.message || "Could not change username.";
-                    usernameError.classList.remove("hidden");
-                    return;
-                }
-                if (taken && taken.id && taken.id !== userId) {
-                    usernameError.textContent = "Username already taken.";
-                    usernameError.classList.remove("hidden");
-                    return;
-                }
-
-                const { data: updatedUser, error: renameErr } = await window.supabaseClient
-                    .from("users")
-                    .update({ username: name })
-                    .eq("id", userId)
-                    .select("id, username")
-                    .maybeSingle();
+                const { data: renamedRows, error: renameErr } = await window.supabaseClient
+                    .rpc("rename_username", { p_new_username: name });
 
                 if (renameErr) {
-                    console.error("[ZChat] username update error:", renameErr);
+                    console.error("[ZChat] rename_username error:", renameErr);
                     usernameError.textContent = renameErr.message || "Could not change username.";
                     usernameError.classList.remove("hidden");
-                    return;
+                    return; // đừng lưu localStorage với username mới nếu server từ chối
                 }
-                if (!updatedUser) {
-                    usernameError.textContent = "Could not change username. Please try again.";
-                    usernameError.classList.remove("hidden");
-                    return;
-                }
-                console.log("[ZChat] Username updated on server:", updatedUser);
+                console.log("[ZChat] Username renamed on server:", renamedRows);
             } catch (err) {
-                console.error("[ZChat] username update exception:", err);
+                console.error("[ZChat] rename_username exception:", err);
                 usernameError.textContent = "Could not change username. Please try again.";
                 usernameError.classList.remove("hidden");
                 return;
