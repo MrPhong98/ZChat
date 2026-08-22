@@ -3833,7 +3833,11 @@ function getVerifiedBadge(isVerified) {
 
                         if (state.activeChatId === chat.id) {
                             renderMessages(chat);
-                            if (chatHeaderName) chatHeaderName.textContent = chat.participant.name;
+                            if (chatHeaderName) {
+                                chatHeaderName.innerHTML =
+                                    escapeHtml(chat.participant.name) +
+                                    getVerifiedBadge(!!chat.participant.isVerified);
+                            }
                             markChatAsRead(chat.id);
                         } else if (!isMineMsg) {
                             chat.unread = (chat.unread || 0) + 1;
